@@ -74,6 +74,18 @@
   #picker .nums button.parbtn { background: var(--green); color: #fff; }
   #picker .nums button.clearbtn { background: #f3e5e2; color: var(--red); font-size: 14px; }
 
+  /* in-page modals (no native dialogs — they fail in iOS standalone/private mode) */
+  .modalWrap { position: fixed; inset: 0; background: rgba(20,35,25,.6); display: none; align-items: center; justify-content: center; z-index: 95; }
+  .modalWrap.show { display: flex; animation: pop .2s ease; }
+  .modalPanel { background: #fff; border-radius: 14px; padding: 18px; width: min(88vw, 360px); text-align: center; }
+  .modalPanel h3 { color: var(--green); margin-bottom: 10px; font-size: 16px; }
+  .modalPanel p { font-size: 14px; margin-bottom: 4px; }
+  .modalPanel .err { color: var(--red); font-size: 12px; min-height: 16px; margin-top: 6px; }
+  .modalPanel .btnrow { display: flex; gap: 8px; margin-top: 12px; }
+  .modalPanel .btnrow .btn { flex: 1; }
+  #toast { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; z-index: 120; display: none; max-width: 90vw; text-align: center; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+  #toast.show { display: block; animation: pop .2s ease; }
+
   #overlay { position: fixed; inset: 0; background: rgba(20,35,25,.82); display: none; align-items: center; justify-content: center; z-index: 100; flex-direction: column; }
   #overlay.show { display: flex; animation: pop .25s ease; }
   @keyframes pop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
@@ -179,6 +191,33 @@
     <div class="nums" id="pkNums"></div>
   </div>
 </div>
+
+<!-- PIN MODAL -->
+<div class="modalWrap" id="pinModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="modalPanel">
+    <h3>Admin PIN</h3>
+    <input type="tel" id="pinInput" placeholder="••••" maxlength="6" style="text-align:center; font-size:22px; letter-spacing:6px;">
+    <div class="err" id="pinErr"></div>
+    <div class="btnrow">
+      <button class="btn secondary" onclick="document.getElementById('pinModal').classList.remove('show')">Cancel</button>
+      <button class="btn" onclick="submitPin()">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modalWrap" id="confirmModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="modalPanel">
+    <h3 id="cfTitle">Are you sure?</h3>
+    <p id="cfMsg"></p>
+    <div class="btnrow">
+      <button class="btn secondary" onclick="document.getElementById('confirmModal').classList.remove('show')">Cancel</button>
+      <button class="btn danger" id="cfYes">Yes, do it</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
 
 <!-- REACTION OVERLAY -->
 <div id="overlay" onclick="hideOverlay()">
@@ -301,9 +340,9 @@ function flights(){
 function joinTournament(){
   const name = document.getElementById("joinName").value.trim();
   const index = parseFloat(document.getElementById("joinHcp").value);
-  if (!name || isNaN(index) || index < 0) { alert("Enter your name and handicap index (e.g. 14.2)."); return; }
+  if (!name || isNaN(index) || index < 0) { toast("Enter your name and handicap index (e.g. 14.2)."); return; }
   const dup = players().find(p => p.name.toLowerCase() === name.toLowerCase());
-  if (dup) { alert("That name is already in the field. If that's you, use \"Already joined?\" below."); return; }
+  if (dup) { toast("That name is already in the field. If that's you, use \"Already joined?\" below."); return; }
   const hcp = Math.max(0, courseHandicap(index));
   const id = "p" + Date.now() + Math.floor(Math.random()*999);
   if (!state.players) state.players = {};
@@ -312,7 +351,7 @@ function joinTournament(){
   localStorage.setItem("birthdayOpenPlayerId", id);
   persist();
   const fl = flightOf({index});
-  alert(`You're in! Index ${index} → Course Handicap ${hcp} at Torrey North (Whites, slope ${COURSE.slope}). Flight ${fl}${fl==="A"?" (16.0 or better)":""}.`);
+  toast(`You're in! Index ${index} → Course Handicap ${hcp} at Torrey North (Whites, slope ${COURSE.slope}). Flight ${fl}${fl==="A"?" (16.0 or better)":""}.`, 6000);
   showPage("score");
 }
 function showReturning(){
@@ -410,16 +449,22 @@ function renderSetup(){
 function resetPlayerScores(id){
   const p = state.players[id];
   if (!p) return;
-  if (!confirm("Reset all of " + p.name + "'s scores? Their name and handicap stay in the field.")) return;
-  if (state.scores) delete state.scores[id];
-  persist();
+  confirmAction("Reset " + p.name + "'s scores?", "Their name and handicap stay in the field.", ()=>{
+    if (state.scores) delete state.scores[id];
+    persist();
+    toast(p.name + "'s scores were reset.");
+  });
 }
 function removePlayer(id){
-  if (!confirm("Remove " + state.players[id].name + "?")) return;
-  delete state.players[id]; if (state.scores) delete state.scores[id];
-  state.pairs = (state.pairs||[]).filter(pr => !pr.includes(id));
-  if (myPlayerId === id) { myPlayerId = null; localStorage.removeItem("birthdayOpenPlayerId"); }
-  persist();
+  const p = state.players[id];
+  if (!p) return;
+  confirmAction("Remove " + p.name + "?", "They can rejoin from the welcome screen anytime.", ()=>{
+    delete state.players[id]; if (state.scores) delete state.scores[id];
+    state.pairs = (state.pairs||[]).filter(pr => !pr.includes(id));
+    if (myPlayerId === id) { myPlayerId = null; localStorage.removeItem("birthdayOpenPlayerId"); }
+    persist();
+    toast(p.name + " removed from the field.");
+  });
 }
 /* ---------- score picker: one tap, one number, one photo ---------- */
 let pickerCtx = null;
@@ -484,37 +529,71 @@ function reactNet(id, hole, gross){
   reactTimer = setTimeout(hideOverlay, 3000);
 }
 function hideOverlay(){ document.getElementById("overlay").classList.remove("show"); }
-function drawPairs(){
+function doDraw(){
   const ids = players().map(p=>p.id);
-  if (ids.length < 2) { alert("Need at least 2 players."); return; }
-  if (state.pairs && state.pairs.length && !confirm("Re-draw all pairs?")) return;
   for (let i = ids.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [ids[i],ids[j]]=[ids[j],ids[i]]; }
   const pairs = [];
   for (let i = 0; i < ids.length; i += 2) pairs.push(ids.slice(i, i+2));
   state.pairs = pairs;
   persist();
-  alert("Pairs drawn! Check the Pairs tab.");
+  toast("Pairs drawn! Check the Pairs tab.");
+}
+function drawPairs(){
+  if (players().length < 2) { toast("Need at least 2 players."); return; }
+  if (state.pairs && state.pairs.length) confirmAction("Re-draw all pairs?", "The current pairings will be replaced.", doDraw);
+  else doDraw();
 }
 function resetScores(){
-  if (!confirm("Wipe ALL scores? (Players and pairs are kept.)")) return;
-  state.scores = {};
-  persist();
+  confirmAction("Wipe ALL scores?", "Players and pairs are kept. This can't be undone.", ()=>{
+    state.scores = {};
+    persist();
+    toast("All scores wiped.");
+  });
 }
+
+/* ---------- in-page dialogs (native prompt/confirm/alert are unreliable
+   on iOS home-screen apps and private tabs — never use them) ---------- */
+let toastTimer = null;
+function toast(msg, ms){
+  const t = document.getElementById("toast");
+  t.textContent = msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove("show"), ms || 4000);
+}
+let cfCallback = null;
+function confirmAction(title, msg, fn){
+  document.getElementById("cfTitle").textContent = title;
+  document.getElementById("cfMsg").textContent = msg;
+  cfCallback = fn;
+  document.getElementById("confirmModal").classList.add("show");
+}
+document.getElementById("cfYes").addEventListener("click", ()=>{
+  document.getElementById("confirmModal").classList.remove("show");
+  if (cfCallback) { const f = cfCallback; cfCallback = null; f(); }
+});
 
 /* ---------- admin gate ---------- */
 const ADMIN_PIN = "6252";
 function adminUnlocked(){ return localStorage.getItem("birthdayOpenAdmin") === "yes"; }
-function checkAdmin(){
-  if (adminUnlocked()) return true;
-  const entry = prompt("Admin PIN:");
-  if (entry === ADMIN_PIN) { localStorage.setItem("birthdayOpenAdmin", "yes"); return true; }
-  if (entry !== null) alert("Wrong PIN — ask the tournament director.");
-  return false;
+function openPinModal(){
+  document.getElementById("pinErr").textContent = "";
+  document.getElementById("pinInput").value = "";
+  document.getElementById("pinModal").classList.add("show");
+  setTimeout(()=>document.getElementById("pinInput").focus(), 50);
+}
+function submitPin(){
+  if (document.getElementById("pinInput").value.trim() === ADMIN_PIN) {
+    localStorage.setItem("birthdayOpenAdmin", "yes");
+    document.getElementById("pinModal").classList.remove("show");
+    showPage("setup");
+  } else {
+    document.getElementById("pinErr").textContent = "Wrong PIN — ask the tournament director.";
+  }
 }
 
 /* ---------- nav ---------- */
 function showPage(name){
-  if (name === "setup" && !checkAdmin()) name = "board";
+  if (name === "setup" && !adminUnlocked()) { openPinModal(); return; }
   document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active", x.dataset.page===name));
   document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
   const pg = document.getElementById("page-" + name);
