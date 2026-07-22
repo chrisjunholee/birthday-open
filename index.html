@@ -58,7 +58,7 @@
   .hole:active { border-color: var(--green-light); }
   .hole .hnum { font-size: 11px; color: var(--muted); font-weight: 700; }
   .hole .hpar { font-size: 10px; color: var(--muted); }
-  .hole .stroke { color: var(--gold); font-weight: 800; }
+  .hole .stroke { color: var(--gold); font-weight: 800; font-size: 15px; }
   .hole .val { display: block; margin-top: 4px; font-size: 22px; font-weight: 800; }
   .hole .val.under { color: var(--blue); } .hole .val.over { color: var(--red); }
   .hole.unset .val { color: #b6c4bb; }
@@ -135,6 +135,7 @@
     <h2>Enter Scores</h2>
     <select id="playerSelect"><option value="">— choose player —</option></select>
     <p class="hint" id="playerMeta"></p>
+    <p class="hint"><a href="#" onclick="localStorage.removeItem('birthdayOpenPlayerId');myPlayerId=null;showPage('join');return false;">Not you? Go to the join screen →</a></p>
   </div>
   <div class="card" id="holesCard" style="display:none">
     <div class="holes" id="holesGrid"></div>
@@ -248,6 +249,13 @@ function initStorage() {
       db.on("value", snap => {
         const v = snap.val();
         state = Object.assign({ players:{}, scores:{}, pairs:[] }, v || {});
+        // If this device remembers a player that no longer exists (removed by
+        // admin, or field was cleared), forget it and offer the join screen.
+        if (myPlayerId && !state.players[myPlayerId]) {
+          myPlayerId = null;
+          localStorage.removeItem("birthdayOpenPlayerId");
+          if (document.getElementById("page-score").classList.contains("active")) showPage("join");
+        }
         renderAll();
       });
       live = true;
@@ -255,8 +263,7 @@ function initStorage() {
       badge.className = "live";
     } catch (e) { console.error(e); fallbackLocal(badge); }
   } else fallbackLocal(badge);
-  // First screen: join if this device has no player yet, else scoreboard
-  if (myPlayerId && !state.players) showPage("board");
+  // First screen: scorecard if this device has a player, else join
   showPage(myPlayerId ? "score" : "join");
 }
 function fallbackLocal(badge){
@@ -376,21 +383,23 @@ function renderHoles(){
     const v = s[i]||0;
     const cls = !v ? "unset" : v<par ? "under" : v>par ? "over" : "";
     const st = strokesFor(p.hcp, i);
-    const dots = st ? ` <span class="stroke">${"●".repeat(st)}</span>` : "";
+    const stars = st ? ` <span class="stroke">${"*".repeat(st)}</span>` : "";
     return `<div class="hole ${!v?'unset':''}" onclick="openPicker('${id}',${i})">
-      <div class="hnum">Hole ${i+1}${dots}</div><div class="hpar">Par ${par} · ${COURSE.yards[i]}y · Hcp ${COURSE.hcps[i]}</div>
+      <div class="hnum">Hole ${i+1}${stars}</div><div class="hpar">Par ${par} · ${COURSE.yards[i]}y · Hcp ${COURSE.hcps[i]}</div>
       <span class="val ${cls}">${v||"·"}</span></div>`;
   }).join("");
   const thru = thruOf(id);
   document.getElementById("scoreSummary").textContent =
-    thru ? `Thru ${thru} · Gross ${grossOf(id)} · Net ${netOf(id)}` : "Tap a hole and enter your score. ● = you get a stroke there.";
+    thru ? `Thru ${thru} · Gross ${grossOf(id)} · Net ${netOf(id)}` : "Tap a hole and enter your score. * = you get a stroke there.";
 }
 
 function renderSetup(){
   document.getElementById("pCount").textContent = players().length;
   document.getElementById("playerList").innerHTML = players().sort((a,b)=>a.hcp-b.hcp).map(p=>{
     const fl = flightOf(p)==="A" ? "<span class='tag a'>A</span>" : "<span class='tag b'>B</span>";
-    return `<div><span>${p.name} ${fl}</span><span>index ${p.index !== undefined ? p.index : "—"} · course ${p.hcp} &nbsp;<a href="#" onclick="removePlayer('${p.id}');return false" style="color:var(--red)">✕</a></span></div>`;
+    return `<div><span>${p.name} ${fl}</span><span>index ${p.index !== undefined ? p.index : "—"} · course ${p.hcp} · thru ${thruOf(p.id)}
+      &nbsp;<a href="#" onclick="resetPlayerScores('${p.id}');return false" title="Reset this player's scores">↺</a>
+      &nbsp;<a href="#" onclick="removePlayer('${p.id}');return false" style="color:var(--red)" title="Remove player">✕</a></span></div>`;
   }).join("");
   document.getElementById("parsGrid").innerHTML = COURSE.pars.map((par,i)=>
     `<div class="hole"><div class="hnum">Hole ${i+1}</div><div class="hpar">Par ${par}</div><div class="hpar">${COURSE.yards[i]}y · Hcp ${COURSE.hcps[i]}</div></div>`).join("");
@@ -398,6 +407,13 @@ function renderSetup(){
 }
 
 /* ---------- actions ---------- */
+function resetPlayerScores(id){
+  const p = state.players[id];
+  if (!p) return;
+  if (!confirm("Reset all of " + p.name + "'s scores? Their name and handicap stay in the field.")) return;
+  if (state.scores) delete state.scores[id];
+  persist();
+}
 function removePlayer(id){
   if (!confirm("Remove " + state.players[id].name + "?")) return;
   delete state.players[id]; if (state.scores) delete state.scores[id];
