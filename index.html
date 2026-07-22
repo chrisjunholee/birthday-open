@@ -501,8 +501,20 @@ function resetScores(){
   persist();
 }
 
+/* ---------- admin gate ---------- */
+const ADMIN_PIN = "6252";
+function adminUnlocked(){ return localStorage.getItem("birthdayOpenAdmin") === "yes"; }
+function checkAdmin(){
+  if (adminUnlocked()) return true;
+  const entry = prompt("Admin PIN:");
+  if (entry === ADMIN_PIN) { localStorage.setItem("birthdayOpenAdmin", "yes"); return true; }
+  if (entry !== null) alert("Wrong PIN — ask the tournament director.");
+  return false;
+}
+
 /* ---------- nav ---------- */
 function showPage(name){
+  if (name === "setup" && !checkAdmin()) name = "board";
   document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active", x.dataset.page===name));
   document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
   const pg = document.getElementById("page-" + name);
