@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Birthday Open — Live Scorecard</title>
+<title>The Birthday Open — Torrey Pines South</title>
 <style>
   :root {
     --green: #1e5631; --green-light: #2e7d46; --fairway: #e8f3ea;
@@ -32,14 +32,15 @@
   .hint { font-size: 12px; color: var(--muted); margin: 6px 0; }
 
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { padding: 7px 6px; text-align: left; border-bottom: 1px solid #edf2ee; }
+  th, td { padding: 7px 5px; text-align: left; border-bottom: 1px solid #edf2ee; }
   th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
   td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-  tr.leader td { background: #fdf6e0; font-weight: 700; }
-  tr.hileader td { background: #fceeeb; font-weight: 700; }
-  .tag { font-size: 10px; padding: 1px 7px; border-radius: 8px; color: #fff; vertical-align: 1px; }
+  td.net, th.net { text-align: right; font-weight: 800; }
+  tr.leader td { background: #fdf6e0; }
+  .tag { font-size: 10px; padding: 1px 7px; border-radius: 8px; color: #fff; vertical-align: 1px; white-space: nowrap; }
   .tag.a { background: var(--blue); } .tag.b { background: var(--green-light); }
-  .tag.lo { background: var(--gold); color:#3a2f00; } .tag.hi { background: var(--red); }
+  .tag.lo { background: var(--gold); color:#3a2f00; } .tag.lg { background: #7a7a7a; }
+  .tag.me { background: var(--green); }
 
   select, input[type=text], input[type=number] { width: 100%; padding: 10px; border: 1px solid #cfdcd3; border-radius: 8px; font-size: 15px; background: #fff; }
   .row { display: flex; gap: 8px; margin-bottom: 8px; }
@@ -47,12 +48,14 @@
   .btn { display: block; width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--green); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; }
   .btn.secondary { background: #e4ede7; color: var(--green); }
   .btn.danger { background: var(--red); }
-  .btn.small { width: auto; padding: 8px 14px; font-size: 13px; display: inline-block; }
 
-  /* scorecard grid */
+  .welcome { text-align: center; padding: 22px 14px; }
+  .welcome .big { font-size: 22px; font-weight: 800; color: var(--green); margin-bottom: 6px; }
+  .flightBanner { text-align:center; font-size: 14px; margin-top: 10px; padding: 10px; border-radius: 10px; background: var(--fairway); }
+
   .holes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
   .hole { background: var(--fairway); border-radius: 10px; padding: 8px 6px; text-align: center; }
-  .hole .hnum { font-size: 11px; color: var(--muted); }
+  .hole .hnum { font-size: 11px; color: var(--muted); font-weight: 700; }
   .hole .hpar { font-size: 10px; color: var(--muted); }
   .hole .ctrl { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px; }
   .hole .ctrl button { width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--green); color: #fff; font-size: 17px; font-weight: 700; cursor: pointer; }
@@ -60,7 +63,6 @@
   .hole .val.under { color: var(--blue); } .hole .val.over { color: var(--red); }
   .hole.unset .val { color: #b6c4bb; }
 
-  /* reaction overlay */
   #overlay { position: fixed; inset: 0; background: rgba(20,35,25,.82); display: none; align-items: center; justify-content: center; z-index: 100; flex-direction: column; }
   #overlay.show { display: flex; animation: pop .25s ease; }
   @keyframes pop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
@@ -74,31 +76,46 @@
   .pairbox .total { font-weight: 800; font-size: 16px; }
   .plist { font-size: 13px; }
   .plist div { display: flex; justify-content: space-between; padding: 6px 2px; border-bottom: 1px solid #f0f4f1; }
-  .setupBanner { background: #fff8e1; border: 1px solid #e6d48a; border-radius: 10px; padding: 10px 12px; font-size: 12.5px; margin-bottom: 14px; color: #5c4a00; }
 </style>
 </head>
 <body>
 
 <header>
   <h1>🏌️ The Birthday Open</h1>
-  <div class="sub" id="subTitle">16 players · A/B flights · blind draw</div>
+  <div class="sub">Torrey Pines South · Net tournament · A/B flights · blind draw</div>
   <span id="syncBadge">connecting…</span>
 </header>
 
-<!-- LEADERBOARD -->
-<div class="page active" id="page-board">
-  <div class="setupBanner" id="demoBanner" style="display:none">
-    <b>Demo mode</b> — scores save only on this device. To go live for everyone, paste your Firebase config into index.html (see README).
+<!-- JOIN -->
+<div class="page" id="page-join">
+  <div class="card welcome">
+    <div class="big">Welcome to the Birthday Open!</div>
+    <div class="hint">Torrey Pines South Course · Par 72</div>
+    <p style="font-size:14px; margin:14px 0;">Enter your name and course handicap to join the field. You'll be placed in a flight automatically — 16 or better plays Flight A.</p>
+    <div class="row"><input type="text" id="joinName" placeholder="Your name"></div>
+    <div class="row"><input type="number" id="joinHcp" placeholder="Course handicap" min="0" max="54"></div>
+    <button class="btn" onclick="joinTournament()">Join the Tournament</button>
+    <p class="hint" style="margin-top:12px;"><a href="#" onclick="showPage('board');return false;">Just watching? View the live scoreboard →</a></p>
+    <p class="hint"><a href="#" onclick="showReturning();return false;">Already joined on another device? Pick your name →</a></p>
+    <div id="returningBox" style="display:none; margin-top:8px;">
+      <select id="returningSelect"><option value="">— choose your name —</option></select>
+      <button class="btn secondary" style="margin-top:8px" onclick="claimPlayer()">That's Me</button>
+    </div>
   </div>
-  <div class="card"><h2>Flight A <span class="tag a">low handicaps</span></h2>
+</div>
+
+<!-- LEADERBOARD -->
+<div class="page" id="page-board">
+  <div class="card"><h2>Flight A <span class="tag a">handicap 16 or better</span></h2>
     <table id="tblA"></table>
   </div>
-  <div class="card"><h2>Flight B <span class="tag b">high handicaps</span></h2>
+  <div class="card"><h2>Flight B <span class="tag b">handicap 17+</span></h2>
     <table id="tblB"></table>
   </div>
   <div class="card"><h2>🎲 Blind Draw Pairs — combined net</h2>
-    <div id="pairsBoard" class="plist"><div class="hint">Pairs not drawn yet — see Setup tab.</div></div>
+    <div id="pairsBoard" class="plist"><div class="hint">Pairs not drawn yet.</div></div>
   </div>
+  <p class="hint" style="text-align:center">Net tournament: leaderboard sorted by net (gross − handicap). Gross shown so bragging rights survive.</p>
 </div>
 
 <!-- SCORECARD -->
@@ -122,22 +139,17 @@
 <!-- SETUP -->
 <div class="page" id="page-setup">
   <div class="card">
-    <h2>Players (<span id="pCount">0</span>/16)</h2>
-    <div class="row">
-      <input type="text" id="newName" placeholder="Name">
-      <input type="number" id="newHcp" placeholder="Handicap" min="0" max="54" style="max-width:110px">
-    </div>
-    <button class="btn" onclick="addPlayer()">Add Player</button>
-    <p class="hint">Flights auto-split: 8 lowest handicaps = Flight A, rest = Flight B. Net = gross − handicap.</p>
+    <h2>Field (<span id="pCount">0</span> players)</h2>
     <div class="plist" id="playerList"></div>
+    <p class="hint">Players join themselves from the welcome screen. Remove someone here if they typo'd.</p>
   </div>
   <div class="card">
     <h2>Blind Draw</h2>
     <button class="btn secondary" onclick="drawPairs()">🎲 Draw / Re-draw Pairs</button>
-    <p class="hint">Randomly pairs all players. Pair score = sum of both players' net.</p>
+    <p class="hint">Randomly pairs the whole field. Pair score = sum of both players' net.</p>
   </div>
   <div class="card">
-    <h2>Course Pars</h2>
+    <h2>Course — Torrey Pines South</h2>
     <div class="holes" id="parsGrid"></div>
     <p class="hint" id="parTotal"></p>
   </div>
@@ -158,20 +170,15 @@
 </div>
 
 <nav>
-  <button class="active" data-page="board"><span class="ico">🏆</span>Leaderboard</button>
-  <button data-page="score"><span class="ico">✏️</span>Scorecard</button>
+  <button data-page="board"><span class="ico">🏆</span>Scoreboard</button>
+  <button data-page="score"><span class="ico">✏️</span>My Scorecard</button>
   <button data-page="pairs"><span class="ico">🎲</span>Pairs</button>
   <button data-page="setup"><span class="ico">⚙️</span>Setup</button>
 </nav>
 
-<!-- Firebase (compat build) -->
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
 <script>
-/* ================================================================
-   1) FIREBASE CONFIG — paste yours here to go live (see README.md).
-      Leave as null to run in demo mode (this device only).
-   ================================================================ */
 const FIREBASE_CONFIG = {
   apiKey: "AIzaSyDPOw8yG1ErAEWFtdI2e0ZNwKImuWBt6Yw",
   authDomain: "joe-h-bday.firebaseapp.com",
@@ -182,25 +189,29 @@ const FIREBASE_CONFIG = {
   appId: "1:359073329833:web:6826b33695b2d1ec40efb8"
 };
 
-/* ================================================================
-   2) REACTIONS — photos of the birthday boy.
-      Drop files with these exact names into a /photos folder next
-      to index.html. Until then, emoji placeholders are shown.
-   ================================================================ */
+/* Reaction photos — files in /photos. Emoji fallback if missing. */
 const REACTIONS = {
-  eagle:    { img: "photos/eagle.jpg",    emoji: "🦅", caption: "EAGLE?!",           sub: "The birthday boy salutes you" },
-  birdie:   { img: "photos/birdie.jpg",   emoji: "👍", caption: "BIRDIE!",           sub: "Birthday boy approves" },
-  par:      { img: "photos/par.jpg",      emoji: "😎", caption: "Par. Solid.",       sub: "Respect" },
-  bogey:    { img: "photos/bogey.jpg",    emoji: "😬", caption: "Bogey…",            sub: "He's seen worse" },
-  double:   { img: "photos/double.jpg",   emoji: "😢", caption: "Double or Worse",   sub: "You made the birthday boy sad" }
+  eagle:  { img: "photos/eagle.jpg",  emoji: "🦅", caption: "EAGLE?!",         sub: "The birthday boy salutes you" },
+  birdie: { img: "photos/birdie.jpg", emoji: "👍", caption: "BIRDIE!",         sub: "Birthday boy approves" },
+  par:    { img: "photos/par.jpg",    emoji: "😎", caption: "Par. Solid.",     sub: "Respect" },
+  bogey:  { img: "photos/bogey.jpg",  emoji: "🤷", caption: "Bogey…",          sub: "He's seen worse" },
+  double: { img: "photos/double.jpg", emoji: "😢", caption: "Double or Worse", sub: "You made the birthday boy sad" }
 };
 
-const DEFAULT_PARS = [4,4,3,5,4,4,3,4,5, 4,3,4,5,4,4,3,4,5]; // edit in Setup tab
-const FLIGHT_A_SIZE = 8;
+/* ---- Torrey Pines South Course ----
+   Par + men's stroke index (HDCP) per hole, White tee yardage.
+   Source: official Torrey Pines South scorecard. */
+const COURSE = {
+  name: "Torrey Pines South",
+  pars:  [4,4,3,4,4,5,4,3,5, 4,3,4,5,4,4,3,4,5],   // 36 out, 36 in, 72 total
+  hcps:  [5,15,13,3,11,9,7,17,1, 16,14,2,6,8,12,18,4,10],
+  yards: [409,323,142,384,382,449,387,139,457, 308,167,411,486,359,339,151,375,473] // White tees
+};
+const FLIGHT_A_MAX_HCP = 16;   // 16 or better = Flight A
 
-/* ---------- state + storage layer (Firebase or localStorage) ---------- */
-let state = { players: {}, scores: {}, pars: DEFAULT_PARS.slice(), pairs: [] };
+let state = { players: {}, scores: {}, pairs: [] };
 let db = null, live = false;
+let myPlayerId = localStorage.getItem("birthdayOpenPlayerId") || null;
 
 function initStorage() {
   const badge = document.getElementById("syncBadge");
@@ -210,18 +221,21 @@ function initStorage() {
       db = firebase.database().ref("tournament");
       db.on("value", snap => {
         const v = snap.val();
-        if (v) state = Object.assign({ players:{}, scores:{}, pars:DEFAULT_PARS.slice(), pairs:[] }, v);
+        state = Object.assign({ players:{}, scores:{}, pairs:[] }, v || {});
         renderAll();
       });
       live = true;
       badge.textContent = "● LIVE — all phones synced";
       badge.className = "live";
-      return;
-    } catch (e) { console.error(e); }
-  }
+    } catch (e) { console.error(e); fallbackLocal(badge); }
+  } else fallbackLocal(badge);
+  // First screen: join if this device has no player yet, else scoreboard
+  if (myPlayerId && !state.players) showPage("board");
+  showPage(myPlayerId ? "score" : "join");
+}
+function fallbackLocal(badge){
   badge.textContent = "DEMO MODE — this device only";
   badge.className = "demo";
-  document.getElementById("demoBanner").style.display = "block";
   const saved = localStorage.getItem("birthdayOpen");
   if (saved) { try { state = JSON.parse(saved); } catch(e){} }
   renderAll();
@@ -232,13 +246,46 @@ function persist() {
 }
 
 /* ---------- helpers ---------- */
-const players = () => Object.entries(state.players).map(([id,p]) => ({id, ...p}));
-function grossOf(id){ const s = state.scores[id]||{}; return Object.values(s).reduce((a,b)=>a+(b||0),0); }
-function thruOf(id){ const s = state.scores[id]||{}; return Object.values(s).filter(v=>v>0).length; }
-function netOf(id){ const p = state.players[id]; return grossOf(id) - (p ? p.hcp : 0); }
+const players = () => Object.entries(state.players || {}).map(([id,p]) => ({id, ...p}));
+function grossOf(id){ const s = (state.scores||{})[id]||{}; return Object.values(s).reduce((a,b)=>a+(b||0),0); }
+function thruOf(id){ const s = (state.scores||{})[id]||{}; return Object.values(s).filter(v=>v>0).length; }
+function netOf(id){ const p = (state.players||{})[id]; return grossOf(id) - (p ? p.hcp : 0); }
+function flightOf(hcp){ return hcp <= FLIGHT_A_MAX_HCP ? "A" : "B"; }
 function flights(){
-  const sorted = players().sort((a,b)=>a.hcp-b.hcp || a.name.localeCompare(b.name));
-  return { A: sorted.slice(0, FLIGHT_A_SIZE), B: sorted.slice(FLIGHT_A_SIZE) };
+  const all = players();
+  return { A: all.filter(p=>flightOf(p.hcp)==="A"), B: all.filter(p=>flightOf(p.hcp)==="B") };
+}
+
+/* ---------- join flow ---------- */
+function joinTournament(){
+  const name = document.getElementById("joinName").value.trim();
+  const hcp = parseInt(document.getElementById("joinHcp").value, 10);
+  if (!name || isNaN(hcp) || hcp < 0) { alert("Enter your name and course handicap."); return; }
+  const dup = players().find(p => p.name.toLowerCase() === name.toLowerCase());
+  if (dup) { alert("That name is already in the field. If that's you, use \"Already joined?\" below."); return; }
+  const id = "p" + Date.now() + Math.floor(Math.random()*999);
+  if (!state.players) state.players = {};
+  state.players[id] = { name, hcp };
+  myPlayerId = id;
+  localStorage.setItem("birthdayOpenPlayerId", id);
+  persist();
+  const fl = flightOf(hcp);
+  alert("You're in! Flight " + fl + (fl==="A" ? " (16 or better)" : "") + ". Time to post a number.");
+  showPage("score");
+}
+function showReturning(){
+  const box = document.getElementById("returningBox");
+  const sel = document.getElementById("returningSelect");
+  sel.innerHTML = "<option value=''>— choose your name —</option>" +
+    players().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}">${p.name} (hcp ${p.hcp})</option>`).join("");
+  box.style.display = "block";
+}
+function claimPlayer(){
+  const id = document.getElementById("returningSelect").value;
+  if (!id) return;
+  myPlayerId = id;
+  localStorage.setItem("birthdayOpenPlayerId", id);
+  showPage("score");
 }
 
 /* ---------- rendering ---------- */
@@ -247,53 +294,53 @@ function renderAll(){ renderBoard(); renderPlayerSelect(); renderHoles(); render
 function renderFlightTable(el, list){
   const rows = list
     .map(p => ({...p, gross: grossOf(p.id), net: netOf(p.id), thru: thruOf(p.id)}))
-    .sort((a,b)=> a.net - b.net);
+    .sort((a,b)=> (a.thru?a.net:9999) - (b.thru?b.net:9999) || a.name.localeCompare(b.name));
   const started = rows.filter(r=>r.thru>0);
   const loNet = started.length ? Math.min(...started.map(r=>r.net)) : null;
-  const hiNet = started.length ? Math.max(...started.map(r=>r.net)) : null;
-  el.innerHTML = "<tr><th>Player</th><th class='num'>Hcp</th><th class='num'>Thru</th><th class='num'>Gross</th><th class='num'>Net</th><th></th></tr>" +
+  const loGross = started.length ? Math.min(...started.map(r=>r.gross)) : null;
+  el.innerHTML = "<tr><th>Player</th><th class='num'>Hcp</th><th class='num'>Thru</th><th class='num'>Gross</th><th class='net'>Net</th><th></th></tr>" +
     (rows.length ? rows.map(r => {
-      const isLo = r.thru>0 && r.net===loNet, isHi = r.thru>0 && r.net===hiNet && started.length>1;
-      return `<tr class="${isLo?'leader':isHi?'hileader':''}"><td>${r.name}</td><td class='num'>${r.hcp}</td><td class='num'>${r.thru||"–"}</td><td class='num'>${r.thru?r.gross:"–"}</td><td class='num'>${r.thru?r.net:"–"}</td><td>${isLo?"<span class='tag lo'>LOW NET</span>":""}${isHi?"<span class='tag hi'>HIGH NET</span>":""}</td></tr>`;
-    }).join("") : "<tr><td colspan='6' class='hint'>No players yet — add them in Setup.</td></tr>");
+      const isLo = r.thru>0 && r.net===loNet, isLg = r.thru>0 && r.gross===loGross;
+      const me = r.id === myPlayerId ? " <span class='tag me'>YOU</span>" : "";
+      return `<tr class="${isLo?'leader':''}"><td>${r.name}${me}</td><td class='num'>${r.hcp}</td><td class='num'>${r.thru||"–"}</td><td class='num'>${r.thru?r.gross:"–"}</td><td class='net'>${r.thru?r.net:"–"}</td><td>${isLo?"<span class='tag lo'>LOW NET</span>":""}${isLg?" <span class='tag lg'>LOW GROSS</span>":""}</td></tr>`;
+    }).join("") : "<tr><td colspan='6' class='hint'>No players yet.</td></tr>");
 }
 function renderBoard(){
   const f = flights();
   renderFlightTable(document.getElementById("tblA"), f.A);
   renderFlightTable(document.getElementById("tblB"), f.B);
   const pb = document.getElementById("pairsBoard");
-  if (!state.pairs || !state.pairs.length) { pb.innerHTML = "<div class='hint'>Pairs not drawn yet — see Setup tab.</div>"; return; }
+  if (!state.pairs || !state.pairs.length) { pb.innerHTML = "<div class='hint'>Pairs not drawn yet.</div>"; document.getElementById("pairsFull").innerHTML = pb.innerHTML; return; }
   const rows = state.pairs.map(pr => {
     const names = pr.map(id => state.players[id] ? state.players[id].name : "?").join(" + ");
     const total = pr.reduce((a,id)=> a + (thruOf(id)?netOf(id):0), 0);
     const anyStarted = pr.some(id=>thruOf(id)>0);
     return { names, total, anyStarted };
-  }).sort((a,b)=>a.total-b.total);
+  }).sort((a,b)=>(a.anyStarted?a.total:9999)-(b.anyStarted?b.total:9999));
   pb.innerHTML = rows.map((r,i)=>`<div class="pairbox"><span>${i===0&&r.anyStarted?"👑 ":""}${r.names}</span><span class="total">${r.anyStarted?r.total:"–"}</span></div>`).join("");
   document.getElementById("pairsFull").innerHTML = pb.innerHTML;
 }
 
 function renderPlayerSelect(){
-  const sel = document.getElementById("playerSelect"), cur = sel.value;
+  const sel = document.getElementById("playerSelect");
+  const cur = sel.value || myPlayerId;
   sel.innerHTML = "<option value=''>— choose player —</option>" +
     players().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
-  if (state.players[cur]) sel.value = cur;
+  if (cur && state.players && state.players[cur]) sel.value = cur;
 }
 function renderHoles(){
   const id = document.getElementById("playerSelect").value;
   const card = document.getElementById("holesCard");
-  if (!id || !state.players[id]) { card.style.display = "none"; return; }
+  if (!id || !state.players || !state.players[id]) { card.style.display = "none"; document.getElementById("playerMeta").textContent=""; return; }
   card.style.display = "block";
   const p = state.players[id];
-  const f = flights();
-  const flight = f.A.some(x=>x.id===id) ? "A" : "B";
-  document.getElementById("playerMeta").textContent = `Handicap ${p.hcp} · Flight ${flight}`;
-  const s = state.scores[id] || {};
-  document.getElementById("holesGrid").innerHTML = state.pars.map((par,i)=>{
+  document.getElementById("playerMeta").textContent = `Handicap ${p.hcp} · Flight ${flightOf(p.hcp)} · ${COURSE.name}`;
+  const s = (state.scores||{})[id] || {};
+  document.getElementById("holesGrid").innerHTML = COURSE.pars.map((par,i)=>{
     const v = s[i]||0;
     const cls = !v ? "unset" : v<par ? "under" : v>par ? "over" : "";
     return `<div class="hole ${!v?'unset':''}">
-      <div class="hnum">Hole ${i+1}</div><div class="hpar">Par ${par}</div>
+      <div class="hnum">Hole ${i+1}</div><div class="hpar">Par ${par} · ${COURSE.yards[i]}y · Hcp ${COURSE.hcps[i]}</div>
       <div class="ctrl">
         <button onclick="bump('${id}',${i},-1)">−</button>
         <span class="val ${cls}">${v||"·"}</span>
@@ -307,38 +354,29 @@ function renderHoles(){
 
 function renderSetup(){
   document.getElementById("pCount").textContent = players().length;
-  const f = flights();
   document.getElementById("playerList").innerHTML = players().sort((a,b)=>a.hcp-b.hcp).map(p=>{
-    const fl = f.A.some(x=>x.id===p.id) ? "<span class='tag a'>A</span>" : "<span class='tag b'>B</span>";
+    const fl = flightOf(p.hcp)==="A" ? "<span class='tag a'>A</span>" : "<span class='tag b'>B</span>";
     return `<div><span>${p.name} ${fl}</span><span>hcp ${p.hcp} &nbsp;<a href="#" onclick="removePlayer('${p.id}');return false" style="color:var(--red)">✕</a></span></div>`;
   }).join("");
-  document.getElementById("parsGrid").innerHTML = state.pars.map((par,i)=>
-    `<div class="hole"><div class="hnum">Hole ${i+1}</div>
-      <div class="ctrl"><button onclick="bumpPar(${i},-1)">−</button><span class="val">${par}</span><button onclick="bumpPar(${i},1)">+</button></div></div>`).join("");
-  document.getElementById("parTotal").textContent = "Course par: " + state.pars.reduce((a,b)=>a+b,0);
+  document.getElementById("parsGrid").innerHTML = COURSE.pars.map((par,i)=>
+    `<div class="hole"><div class="hnum">Hole ${i+1}</div><div class="hpar">Par ${par}</div><div class="hpar">${COURSE.yards[i]}y · Hcp ${COURSE.hcps[i]}</div></div>`).join("");
+  document.getElementById("parTotal").textContent = COURSE.name + " · Par " + COURSE.pars.reduce((a,b)=>a+b,0) + " · White tees. Flight A = handicap " + FLIGHT_A_MAX_HCP + " or better.";
 }
 
 /* ---------- actions ---------- */
-function addPlayer(){
-  const name = document.getElementById("newName").value.trim();
-  const hcp = parseInt(document.getElementById("newHcp").value, 10);
-  if (!name || isNaN(hcp)) { alert("Enter a name and a handicap."); return; }
-  const id = "p" + Date.now() + Math.floor(Math.random()*999);
-  state.players[id] = { name, hcp };
-  document.getElementById("newName").value = ""; document.getElementById("newHcp").value = "";
-  persist();
-}
 function removePlayer(id){
   if (!confirm("Remove " + state.players[id].name + "?")) return;
-  delete state.players[id]; delete state.scores[id];
+  delete state.players[id]; if (state.scores) delete state.scores[id];
   state.pairs = (state.pairs||[]).filter(pr => !pr.includes(id));
+  if (myPlayerId === id) { myPlayerId = null; localStorage.removeItem("birthdayOpenPlayerId"); }
   persist();
 }
 function bump(id, hole, d){
+  if (!state.scores) state.scores = {};
   if (!state.scores[id]) state.scores[id] = {};
-  const par = state.pars[hole];
+  const par = COURSE.pars[hole];
   let v = state.scores[id][hole] || 0;
-  if (!v) v = d > 0 ? par : 0;           // first + tap = par
+  if (!v) v = d > 0 ? par : 0;
   else v = Math.max(0, v + d);
   if (v === 0) delete state.scores[id][hole];
   else state.scores[id][hole] = v;
@@ -356,12 +394,11 @@ function maybeReact(score, par, name, hole){
   else if (diff === 1) key = "bogey";
   else if (diff >= 2) key = "double";
   if (!key) return;
-  if (key === "par" && score !== par) return;
   const r = REACTIONS[key];
   const img = document.getElementById("ovImg"), em = document.getElementById("ovEmoji");
   img.style.display = "block"; em.style.display = "none";
   em.textContent = r.emoji;
-  img.src = r.img + "?v=" + Date.now()%7;  // avoid stale cache during the round
+  img.src = r.img + "?v=" + Date.now()%7;
   document.getElementById("ovCaption").textContent = r.caption;
   document.getElementById("ovSub").textContent = name + " · Hole " + (hole+1) + " · " + r.sub;
   document.getElementById("overlay").classList.add("show");
@@ -369,10 +406,9 @@ function maybeReact(score, par, name, hole){
   reactTimer = setTimeout(hideOverlay, 2600);
 }
 function hideOverlay(){ document.getElementById("overlay").classList.remove("show"); }
-function bumpPar(i, d){ state.pars[i] = Math.min(6, Math.max(3, state.pars[i]+d)); persist(); }
 function drawPairs(){
   const ids = players().map(p=>p.id);
-  if (ids.length < 2) { alert("Add players first."); return; }
+  if (ids.length < 2) { alert("Need at least 2 players."); return; }
   if (state.pairs && state.pairs.length && !confirm("Re-draw all pairs?")) return;
   for (let i = ids.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [ids[i],ids[j]]=[ids[j],ids[i]]; }
   const pairs = [];
@@ -388,12 +424,17 @@ function resetScores(){
 }
 
 /* ---------- nav ---------- */
-document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => {
-  document.querySelectorAll("nav button").forEach(x=>x.classList.remove("active"));
+function showPage(name){
+  document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active", x.dataset.page===name));
   document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
-  b.classList.add("active");
-  document.getElementById("page-" + b.dataset.page).classList.add("active");
-}));
+  const pg = document.getElementById("page-" + name);
+  if (pg) pg.classList.add("active");
+  if (name === "score" && myPlayerId && state.players && state.players[myPlayerId]) {
+    document.getElementById("playerSelect").value = myPlayerId;
+    renderHoles();
+  }
+}
+document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => showPage(b.dataset.page)));
 document.getElementById("playerSelect").addEventListener("change", renderHoles);
 
 initStorage();
