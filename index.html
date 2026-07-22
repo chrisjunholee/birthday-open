@@ -54,14 +54,25 @@
   .flightBanner { text-align:center; font-size: 14px; margin-top: 10px; padding: 10px; border-radius: 10px; background: var(--fairway); }
 
   .holes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-  .hole { background: var(--fairway); border-radius: 10px; padding: 8px 6px; text-align: center; }
+  .hole { background: var(--fairway); border-radius: 10px; padding: 8px 6px; text-align: center; cursor: pointer; border: 2px solid transparent; }
+  .hole:active { border-color: var(--green-light); }
   .hole .hnum { font-size: 11px; color: var(--muted); font-weight: 700; }
   .hole .hpar { font-size: 10px; color: var(--muted); }
-  .hole .ctrl { display: flex; align-items: center; justify-content: center; gap: 6px; margin-top: 4px; }
-  .hole .ctrl button { width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--green); color: #fff; font-size: 17px; font-weight: 700; cursor: pointer; }
-  .hole .val { min-width: 26px; font-size: 18px; font-weight: 800; }
+  .hole .stroke { color: var(--gold); font-weight: 800; }
+  .hole .val { display: block; margin-top: 4px; font-size: 22px; font-weight: 800; }
   .hole .val.under { color: var(--blue); } .hole .val.over { color: var(--red); }
   .hole.unset .val { color: #b6c4bb; }
+
+  /* score picker */
+  #picker { position: fixed; inset: 0; background: rgba(20,35,25,.6); display: none; align-items: flex-end; justify-content: center; z-index: 90; }
+  #picker.show { display: flex; }
+  #picker .panel { background: #fff; border-radius: 18px 18px 0 0; padding: 16px 16px 26px; width: 100%; max-width: 640px; }
+  #picker .ptitle { font-weight: 800; font-size: 16px; color: var(--green); text-align: center; }
+  #picker .psub { font-size: 12px; color: var(--muted); text-align: center; margin: 4px 0 12px; }
+  #picker .nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  #picker .nums button { padding: 14px 0; font-size: 20px; font-weight: 800; border: none; border-radius: 12px; background: var(--fairway); color: var(--ink); cursor: pointer; }
+  #picker .nums button.parbtn { background: var(--green); color: #fff; }
+  #picker .nums button.clearbtn { background: #f3e5e2; color: var(--red); font-size: 14px; }
 
   #overlay { position: fixed; inset: 0; background: rgba(20,35,25,.82); display: none; align-items: center; justify-content: center; z-index: 100; flex-direction: column; }
   #overlay.show { display: flex; animation: pop .25s ease; }
@@ -159,6 +170,15 @@
   </div>
 </div>
 
+<!-- SCORE PICKER -->
+<div id="picker" onclick="if(event.target===this)closePicker()">
+  <div class="panel">
+    <div class="ptitle" id="pkTitle"></div>
+    <div class="psub" id="pkSub"></div>
+    <div class="nums" id="pkNums"></div>
+  </div>
+</div>
+
 <!-- REACTION OVERLAY -->
 <div id="overlay" onclick="hideOverlay()">
   <div class="photoWrap">
@@ -250,6 +270,12 @@ const players = () => Object.entries(state.players || {}).map(([id,p]) => ({id, 
 function grossOf(id){ const s = (state.scores||{})[id]||{}; return Object.values(s).reduce((a,b)=>a+(b||0),0); }
 function thruOf(id){ const s = (state.scores||{})[id]||{}; return Object.values(s).filter(v=>v>0).length; }
 function netOf(id){ const p = (state.players||{})[id]; return grossOf(id) - (p ? p.hcp : 0); }
+/* Strokes received on a hole per USGA allocation: 1 stroke on holes with
+   index <= handicap (plus a 2nd stroke on the hardest holes for 19+). */
+function strokesFor(hcp, hole){
+  const idx = COURSE.hcps[hole];
+  return Math.floor(hcp/18) + (idx <= (hcp % 18) ? 1 : 0);
+}
 function flightOf(hcp){ return hcp <= FLIGHT_A_MAX_HCP ? "A" : "B"; }
 function flights(){
   const all = players();
@@ -339,17 +365,15 @@ function renderHoles(){
   document.getElementById("holesGrid").innerHTML = COURSE.pars.map((par,i)=>{
     const v = s[i]||0;
     const cls = !v ? "unset" : v<par ? "under" : v>par ? "over" : "";
-    return `<div class="hole ${!v?'unset':''}">
-      <div class="hnum">Hole ${i+1}</div><div class="hpar">Par ${par} · ${COURSE.yards[i]}y · Hcp ${COURSE.hcps[i]}</div>
-      <div class="ctrl">
-        <button onclick="bump('${id}',${i},-1)">−</button>
-        <span class="val ${cls}">${v||"·"}</span>
-        <button onclick="bump('${id}',${i},1)">+</button>
-      </div></div>`;
+    const st = strokesFor(p.hcp, i);
+    const dots = st ? ` <span class="stroke">${"●".repeat(st)}</span>` : "";
+    return `<div class="hole ${!v?'unset':''}" onclick="openPicker('${id}',${i})">
+      <div class="hnum">Hole ${i+1}${dots}</div><div class="hpar">Par ${par} · ${COURSE.yards[i]}y · Hcp ${COURSE.hcps[i]}</div>
+      <span class="val ${cls}">${v||"·"}</span></div>`;
   }).join("");
   const thru = thruOf(id);
   document.getElementById("scoreSummary").textContent =
-    thru ? `Thru ${thru} · Gross ${grossOf(id)} · Net ${netOf(id)}` : "Tap + on a hole to start. First tap sets it to par.";
+    thru ? `Thru ${thru} · Gross ${grossOf(id)} · Net ${netOf(id)}` : "Tap a hole and enter your score. ● = you get a stroke there.";
 }
 
 function renderSetup(){
@@ -371,39 +395,67 @@ function removePlayer(id){
   if (myPlayerId === id) { myPlayerId = null; localStorage.removeItem("birthdayOpenPlayerId"); }
   persist();
 }
-function bump(id, hole, d){
+/* ---------- score picker: one tap, one number, one photo ---------- */
+let pickerCtx = null;
+function openPicker(id, hole){
+  pickerCtx = { id, hole };
+  const p = state.players[id];
+  const par = COURSE.pars[hole];
+  const st = strokesFor(p.hcp, hole);
+  document.getElementById("pkTitle").textContent = `Hole ${hole+1} · Par ${par}`;
+  document.getElementById("pkSub").textContent =
+    (st ? `${p.name} gets ${st} stroke${st>1?"s":""} here · ` : "") + `${COURSE.yards[hole]} yds · Hcp ${COURSE.hcps[hole]}`;
+  const cur = ((state.scores||{})[id]||{})[hole] || 0;
+  let html = "";
+  for (let n = 1; n <= 11; n++)
+    html += `<button class="${n===par?'parbtn':''}" onclick="setScore(${n})">${n}${n===cur?" ✓":""}</button>`;
+  html += `<button class="clearbtn" onclick="setScore(0)">clear</button>`;
+  document.getElementById("pkNums").innerHTML = html;
+  document.getElementById("picker").classList.add("show");
+}
+function closePicker(){ document.getElementById("picker").classList.remove("show"); pickerCtx = null; }
+function setScore(v){
+  if (!pickerCtx) return;
+  const { id, hole } = pickerCtx;
+  closePicker();
   if (!state.scores) state.scores = {};
   if (!state.scores[id]) state.scores[id] = {};
-  const par = COURSE.pars[hole];
-  let v = state.scores[id][hole] || 0;
-  if (!v) v = d > 0 ? par : 0;
-  else v = Math.max(0, v + d);
   if (v === 0) delete state.scores[id][hole];
   else state.scores[id][hole] = v;
   persist();
   if (!live) renderHoles();
-  if (v > 0 && d !== 0) maybeReact(v, par, state.players[id].name, hole);
+  if (v > 0) reactNet(id, hole, v);
 }
+
+/* Reaction is based on NET (this is a net tournament): gross minus any
+   stroke(s) received on the hole, compared to par. Subtitle explains the math. */
 let reactTimer = null;
-function maybeReact(score, par, name, hole){
-  const diff = score - par;
-  let key = null;
+function reactNet(id, hole, gross){
+  const p = state.players[id];
+  const par = COURSE.pars[hole];
+  const st = strokesFor(p.hcp, hole);
+  const net = gross - st;
+  const diff = net - par;
+  let key;
   if (diff <= -2) key = "eagle";
   else if (diff === -1) key = "birdie";
   else if (diff === 0) key = "par";
   else if (diff === 1) key = "bogey";
-  else if (diff >= 2) key = "double";
-  if (!key) return;
+  else key = "double";
   const r = REACTIONS[key];
+  const netName = diff <= -2 ? "Net Eagle" : diff === -1 ? "Net Birdie" : diff === 0 ? "Net Par" : diff === 1 ? "Net Bogey" : "Net Double+";
   const img = document.getElementById("ovImg"), em = document.getElementById("ovEmoji");
   img.style.display = "block"; em.style.display = "none";
   em.textContent = r.emoji;
   img.src = r.img + "?v=" + Date.now()%7;
-  document.getElementById("ovCaption").textContent = r.caption;
-  document.getElementById("ovSub").textContent = name + " · Hole " + (hole+1) + " · " + r.sub;
+  document.getElementById("ovCaption").textContent = st ? netName + "!" : r.caption;
+  document.getElementById("ovSub").textContent =
+    p.name + " · Hole " + (hole+1) + " · " +
+    (st ? `Gross ${gross} − ${st} stroke${st>1?"s":""} = Net ${net}` : `Gross ${gross}, no stroke here`) +
+    " · " + r.sub;
   document.getElementById("overlay").classList.add("show");
   clearTimeout(reactTimer);
-  reactTimer = setTimeout(hideOverlay, 2600);
+  reactTimer = setTimeout(hideOverlay, 3000);
 }
 function hideOverlay(){ document.getElementById("overlay").classList.remove("show"); }
 function drawPairs(){
