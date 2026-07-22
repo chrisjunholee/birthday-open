@@ -102,9 +102,9 @@
   <div class="card welcome">
     <div class="big">Welcome to the Birthday Open!</div>
     <div class="hint">Torrey Pines South Course · Par 72</div>
-    <p style="font-size:14px; margin:14px 0;">Enter your name and course handicap to join the field. You'll be placed in a flight automatically — 16 or better plays Flight A.</p>
+    <p style="font-size:14px; margin:14px 0;">Enter your name and your regular handicap index — we'll convert it to your Torrey South course handicap automatically (White tees, slope 128). Index of 16.0 or better plays Flight A.</p>
     <div class="row"><input type="text" id="joinName" placeholder="Your name"></div>
-    <div class="row"><input type="number" id="joinHcp" placeholder="Course handicap" min="0" max="54"></div>
+    <div class="row"><input type="number" id="joinHcp" placeholder="Handicap index (e.g. 14.2)" min="0" max="54" step="0.1"></div>
     <button class="btn" onclick="joinTournament()">Join the Tournament</button>
     <p class="hint" style="margin-top:12px;"><a href="#" onclick="showPage('board');return false;">Just watching? View the live scoreboard →</a></p>
     <p class="hint"><a href="#" onclick="showReturning();return false;">Already joined on another device? Pick your name →</a></p>
@@ -117,10 +117,10 @@
 
 <!-- LEADERBOARD -->
 <div class="page" id="page-board">
-  <div class="card"><h2>Flight A <span class="tag a">handicap 16 or better</span></h2>
+  <div class="card"><h2>Flight A <span class="tag a">index 16.0 or better</span></h2>
     <table id="tblA"></table>
   </div>
-  <div class="card"><h2>Flight B <span class="tag b">handicap 17+</span></h2>
+  <div class="card"><h2>Flight B <span class="tag b">index over 16.0</span></h2>
     <table id="tblB"></table>
   </div>
   <div class="card"><h2>🎲 Blind Draw Pairs — combined net</h2>
@@ -225,9 +225,15 @@ const COURSE = {
   name: "Torrey Pines South",
   pars:  [4,4,3,4,4,5,4,3,5, 4,3,4,5,4,4,3,4,5],   // 36 out, 36 in, 72 total
   hcps:  [5,15,13,3,11,9,7,17,1, 16,14,2,6,8,12,18,4,10],
-  yards: [409,323,142,384,382,449,387,139,457, 308,167,411,486,359,339,151,375,473] // White tees
+  yards: [409,323,142,384,382,449,387,139,457, 308,167,411,486,359,339,151,375,473], // White tees
+  slope: 128, rating: 70.9, par: 72  // White tees (men)
 };
-const FLIGHT_A_MAX_HCP = 16;   // 16 or better = Flight A
+const FLIGHT_A_MAX_INDEX = 16;   // index 16.0 or better = Flight A
+
+/* Course Handicap = Index × (Slope/113) + (Rating − Par), per WHS. */
+function courseHandicap(index){
+  return Math.round(index * (COURSE.slope/113) + (COURSE.rating - COURSE.par));
+}
 
 let state = { players: {}, scores: {}, pairs: [] };
 let db = null, live = false;
@@ -276,34 +282,37 @@ function strokesFor(hcp, hole){
   const idx = COURSE.hcps[hole];
   return Math.floor(hcp/18) + (idx <= (hcp % 18) ? 1 : 0);
 }
-function flightOf(hcp){ return hcp <= FLIGHT_A_MAX_HCP ? "A" : "B"; }
+/* Flight by handicap INDEX (the number people know): 16.0 or better = A.
+   Strokes and net use the converted course handicap. */
+function flightOf(p){ return (p.index !== undefined ? p.index : p.hcp) <= FLIGHT_A_MAX_INDEX ? "A" : "B"; }
 function flights(){
   const all = players();
-  return { A: all.filter(p=>flightOf(p.hcp)==="A"), B: all.filter(p=>flightOf(p.hcp)==="B") };
+  return { A: all.filter(p=>flightOf(p)==="A"), B: all.filter(p=>flightOf(p)==="B") };
 }
 
 /* ---------- join flow ---------- */
 function joinTournament(){
   const name = document.getElementById("joinName").value.trim();
-  const hcp = parseInt(document.getElementById("joinHcp").value, 10);
-  if (!name || isNaN(hcp) || hcp < 0) { alert("Enter your name and course handicap."); return; }
+  const index = parseFloat(document.getElementById("joinHcp").value);
+  if (!name || isNaN(index) || index < 0) { alert("Enter your name and handicap index (e.g. 14.2)."); return; }
   const dup = players().find(p => p.name.toLowerCase() === name.toLowerCase());
   if (dup) { alert("That name is already in the field. If that's you, use \"Already joined?\" below."); return; }
+  const hcp = Math.max(0, courseHandicap(index));
   const id = "p" + Date.now() + Math.floor(Math.random()*999);
   if (!state.players) state.players = {};
-  state.players[id] = { name, hcp };
+  state.players[id] = { name, index, hcp };
   myPlayerId = id;
   localStorage.setItem("birthdayOpenPlayerId", id);
   persist();
-  const fl = flightOf(hcp);
-  alert("You're in! Flight " + fl + (fl==="A" ? " (16 or better)" : "") + ". Time to post a number.");
+  const fl = flightOf({index});
+  alert(`You're in! Index ${index} → Course Handicap ${hcp} at Torrey South (Whites, slope ${COURSE.slope}). Flight ${fl}${fl==="A"?" (16.0 or better)":""}.`);
   showPage("score");
 }
 function showReturning(){
   const box = document.getElementById("returningBox");
   const sel = document.getElementById("returningSelect");
   sel.innerHTML = "<option value=''>— choose your name —</option>" +
-    players().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}">${p.name} (hcp ${p.hcp})</option>`).join("");
+    players().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}">${p.name} (index ${p.index !== undefined ? p.index : p.hcp})</option>`).join("");
   box.style.display = "block";
 }
 function claimPlayer(){
@@ -360,7 +369,8 @@ function renderHoles(){
   if (!id || !state.players || !state.players[id]) { card.style.display = "none"; document.getElementById("playerMeta").textContent=""; return; }
   card.style.display = "block";
   const p = state.players[id];
-  document.getElementById("playerMeta").textContent = `Handicap ${p.hcp} · Flight ${flightOf(p.hcp)} · ${COURSE.name}`;
+  document.getElementById("playerMeta").textContent =
+    `Index ${p.index !== undefined ? p.index : "—"} → Course Hcp ${p.hcp} · Flight ${flightOf(p)} · ${COURSE.name} (Whites)`;
   const s = (state.scores||{})[id] || {};
   document.getElementById("holesGrid").innerHTML = COURSE.pars.map((par,i)=>{
     const v = s[i]||0;
@@ -379,12 +389,12 @@ function renderHoles(){
 function renderSetup(){
   document.getElementById("pCount").textContent = players().length;
   document.getElementById("playerList").innerHTML = players().sort((a,b)=>a.hcp-b.hcp).map(p=>{
-    const fl = flightOf(p.hcp)==="A" ? "<span class='tag a'>A</span>" : "<span class='tag b'>B</span>";
-    return `<div><span>${p.name} ${fl}</span><span>hcp ${p.hcp} &nbsp;<a href="#" onclick="removePlayer('${p.id}');return false" style="color:var(--red)">✕</a></span></div>`;
+    const fl = flightOf(p)==="A" ? "<span class='tag a'>A</span>" : "<span class='tag b'>B</span>";
+    return `<div><span>${p.name} ${fl}</span><span>index ${p.index !== undefined ? p.index : "—"} · course ${p.hcp} &nbsp;<a href="#" onclick="removePlayer('${p.id}');return false" style="color:var(--red)">✕</a></span></div>`;
   }).join("");
   document.getElementById("parsGrid").innerHTML = COURSE.pars.map((par,i)=>
     `<div class="hole"><div class="hnum">Hole ${i+1}</div><div class="hpar">Par ${par}</div><div class="hpar">${COURSE.yards[i]}y · Hcp ${COURSE.hcps[i]}</div></div>`).join("");
-  document.getElementById("parTotal").textContent = COURSE.name + " · Par " + COURSE.pars.reduce((a,b)=>a+b,0) + " · White tees. Flight A = handicap " + FLIGHT_A_MAX_HCP + " or better.";
+  document.getElementById("parTotal").textContent = COURSE.name + " · Par " + COURSE.par + " · White tees (rating " + COURSE.rating + ", slope " + COURSE.slope + "). Course handicap computed from index automatically. Flight A = index " + FLIGHT_A_MAX_INDEX + ".0 or better.";
 }
 
 /* ---------- actions ---------- */
