@@ -128,7 +128,7 @@ select, input[type=text], input[type=number] { width: 100%; padding: 10px; borde
 <div class="card welcome">
 <div class="big">Welcome to the Birthday Open!</div>
 <div class="hint">Torrey Pines North Course · Par 72</div>
-<p style="font-size:14px; margin:14px 0;">Enter your name and your regular handicap index — we'll convert it to your Torrey North course handicap automatically (White tees, slope 120). Index of 16.0 or better plays Flight A.</p>
+<p style="font-size:14px; margin:14px 0;">Enter your name and your regular handicap index — we'll convert it to your Torrey North course handicap automatically (White tees, slope 120). Index of 14.0 or better plays Flight A.</p>
 <div class="row"><input type="text" id="joinName" placeholder="Your name"></div>
 <div class="row"><input type="number" id="joinHcp" placeholder="Handicap index (e.g. 14.2)" min="0" max="54" step="0.1"></div>
 <button class="btn" onclick="joinTournament()">Join the Tournament</button>
@@ -143,10 +143,10 @@ select, input[type=text], input[type=number] { width: 100%; padding: 10px; borde
 
 <!-- LEADERBOARD -->
 <div class="page" id="page-board">
-<div class="card"><h2>Flight A <span class="tag a">index 16.0 or better</span></h2>
+<div class="card"><h2>Flight A <span class="tag a">index 14.0 or better</span></h2>
 <table id="tblA"></table>
 </div>
-<div class="card"><h2>Flight B <span class="tag b">index over 16.0</span></h2>
+<div class="card"><h2>Flight B <span class="tag b">index over 14.0</span></h2>
 <table id="tblB"></table>
 </div>
 <div class="card"><h2>🎲 Blind Draw Pairs — combined net</h2>
@@ -288,7 +288,7 @@ hcps: [5,1,13,3,11,7,9,17,15, 12,18,14,4,6,16,8,10,2],
 yards: [351,355,145,357,437,380,274,161,460, 460,310,108,383,340,145,336,472,373], // White tees
 slope: 120, rating: 69.3, par: 72 // White tees (men)
 };
-const FLIGHT_A_MAX_INDEX = 16; // index 16.0 or better = Flight A
+const FLIGHT_A_MAX_INDEX = 14; // index 14.0 or better = Flight A
 
 /* Course Handicap = Index × (Slope/113) + (Rating − Par), per WHS. */
 function courseHandicap(index){
@@ -348,7 +348,7 @@ function strokesFor(hcp, hole){
 const idx = COURSE.hcps[hole];
 return Math.floor(hcp/18) + (idx <= (hcp % 18) ? 1 : 0);
 }
-/* Flight by handicap INDEX (the number people know): 16.0 or better = A.
+/* Flight by handicap INDEX (the number people know): 14.0 or better = A.
 Strokes and net use the converted course handicap. */
 function flightOf(p){ return (p.index !== undefined ? p.index : p.hcp) <= FLIGHT_A_MAX_INDEX ? "A" : "B"; }
 function flights(){
@@ -371,7 +371,7 @@ myPlayerId = id;
 localStorage.setItem("birthdayOpenPlayerId", id);
 persist();
 const fl = flightOf({index});
-toast(`You're in! Index ${index} → Course Handicap ${hcp} at Torrey North (Whites, slope ${COURSE.slope}). Flight ${fl}${fl==="A"?" (16.0 or better)":""}.`, 6000);
+toast(`You're in! Index ${index} → Course Handicap ${hcp} at Torrey North (Whites, slope ${COURSE.slope}). Flight ${fl}${fl==="A"?" (14.0 or better)":""}.`, 6000);
 showPage("score");
 }
 function showReturning(){
@@ -567,14 +567,26 @@ clearTimeout(reactTimer);
 reactTimer = setTimeout(hideOverlay, 3000);
 }
 function hideOverlay(){ document.getElementById("overlay").classList.remove("show"); }
+/* Blind draw pairs one Flight A player with one Flight B player. If the two
+flights aren't equal, the balanced portion is paired A-with-B and any
+leftovers from the bigger flight are paired among themselves (with one solo
+if the total field is odd). */
 function doDraw(){
-const ids = players().map(p=>p.id);
-for (let i = ids.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [ids[i],ids[j]]=[ids[j],ids[i]]; }
+const shuffle = arr => { for (let i = arr.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; };
+const f = flights();
+const a = shuffle(f.A.map(p=>p.id));
+const b = shuffle(f.B.map(p=>p.id));
 const pairs = [];
-for (let i = 0; i < ids.length; i += 2) pairs.push(ids.slice(i, i+2));
+const n = Math.min(a.length, b.length);
+for (let i = 0; i < n; i++) pairs.push([a[i], b[i]]);       // A vs B
+const rest = a.slice(n).concat(b.slice(n));                 // extras from the bigger flight
+for (let i = 0; i < rest.length; i += 2) pairs.push(rest.slice(i, i+2));
 state.pairs = pairs;
 persist();
-toast("Pairs drawn! Check the Pairs tab.");
+const uneven = a.length !== b.length;
+toast(uneven
+? "Pairs drawn — A vs B where possible. Flights are uneven, so some are paired within a flight. Check the Pairs tab."
+: "Pairs drawn — each Flight A player vs a Flight B player! Check the Pairs tab.", uneven ? 6000 : 4000);
 }
 function drawPairs(){
 if (players().length < 2) { toast("Need at least 2 players."); return; }
