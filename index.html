@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>The Birthday Open — Torrey Pines North</title>
+<style>
+:root {
+--green: #1e5631; --green-light: #2e7d46; --fairway: #e8f3ea;
+--gold: #c9a227; --red: #b3402f; --blue: #2b5b8a;
+--ink: #1c2321; --muted: #6b7a72; --card: #ffffff; --bg: #f2f6f3;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--ink); padding-bottom: 76px; }
+
+header { background: var(--green); color: #fff; padding: 14px 16px 10px; text-align: center; }
+header h1 { font-size: 20px; letter-spacing: .5px; }
+header .sub { font-size: 12px; opacity: .85; margin-top: 2px; }
+#syncBadge { display:inline-block; margin-top:6px; font-size:11px; padding:2px 10px; border-radius:10px; background:rgba(255,255,255,.18); }
+#syncBadge.live { background: #3f9b5c; }
+#syncBadge.demo { background: var(--gold); color:#3a2f00; }
+
+nav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; background: #fff; border-top: 1px solid #d7e2da; z-index: 50; }
+nav button { flex: 1; padding: 10px 4px 12px; background: none; border: none; font-size: 11px; color: var(--muted); cursor: pointer; }
+nav button .ico { display: block; font-size: 20px; margin-bottom: 2px; }
+nav button.active { color: var(--green); font-weight: 700; }
+
+.page { display: none; padding: 14px; max-width: 640px; margin: 0 auto; }
+.page.active { display: block; }
+.card { background: var(--card); border-radius: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.07); padding: 14px; margin-bottom: 14px; }
+.card h2 { font-size: 15px; color: var(--green); margin-bottom: 10px; letter-spacing: .3px; }
+.hint { font-size: 12px; color: var(--muted); margin: 6px 0; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { padding: 7px 5px; text-align: left; border-bottom: 1px solid #edf2ee; }
+th { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+td.net, th.net { text-align: right; font-weight: 800; }
+tr.leader td { background: #fdf6e0; }
+.tag { font-size: 10px; padding: 1px 7px; border-radius: 8px; color: #fff; vertical-align: 1px; white-space: nowrap; }
+.tag.a { background: var(--blue); } .tag.b { background: var(--green-light); }
+.tag.lo { background: var(--gold); color:#3a2f00; } .tag.lg { background: #7a7a7a; }
+.tag.me { background: var(--green); }
+
+select, input[type=text], input[type=number] { width: 100%; padding: 10px; border: 1px solid #cfdcd3; border-radius: 8px; font-size: 15px; background: #fff; }
+.row { display: flex; gap: 8px; margin-bottom: 8px; }
+.row > * { flex: 1; }
+.btn { display: block; width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--green); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; }
+.btn.secondary { background: #e4ede7; color: var(--green); }
+.btn.danger { background: var(--red); }
+
+.welcome { text-align: center; padding: 22px 14px; }
+.welcome .big { font-size: 22px; font-weight: 800; color: var(--green); margin-bottom: 6px; }
+.flightBanner { text-align:center; font-size: 14px; margin-top: 10px; padding: 10px; border-radius: 10px; background: var(--fairway); }
+
+/* proxy scoring banner — shown when you're entering for someone else */
+.proxyBanner { background: #fdf6e0; border: 1px solid var(--gold); color: #5a4a00; border-radius: 10px; padding: 9px 12px; font-size: 13px; margin-bottom: 12px; text-align: center; line-height: 1.4; }
+.proxyBanner a { color: var(--green); font-weight: 700; text-decoration: none; }
+
+.holes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.hole { background: var(--fairway); border-radius: 10px; padding: 8px 6px; text-align: center; cursor: pointer; border: 2px solid transparent; }
+.hole:active { border-color: var(--green-light); }
+.hole .hnum { font-size: 11px; color: var(--muted); font-weight: 700; }
+.hole .hpar { font-size: 10px; color: var(--muted); }
+.hole .stroke { color: var(--gold); font-weight: 800; font-size: 15px; }
+.hole .val { display: block; margin-top: 4px; font-size: 22px; font-weight: 800; }
+.hole .val.under { color: var(--blue); } .hole .val.over { color: var(--red); }
+.hole.unset .val { color: #b6c4bb; }
+
+/* score picker */
+#picker { position: fixed; inset: 0; background: rgba(20,35,25,.6); display: none; align-items: flex-end; justify-content: center; z-index: 90; }
+#picker.show { display: flex; }
+#picker .panel { background: #fff; border-radius: 18px 18px 0 0; padding: 16px 16px 26px; width: 100%; max-width: 640px; }
+#picker .ptitle { font-weight: 800; font-size: 16px; color: var(--green); text-align: center; }
+#picker .psub { font-size: 12px; color: var(--muted); text-align: center; margin: 4px 0 12px; }
+#picker .nums { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+#picker .nums button { padding: 14px 0; font-size: 20px; font-weight: 800; border: none; border-radius: 12px; background: var(--fairway); color: var(--ink); cursor: pointer; }
+#picker .nums button.parbtn { background: var(--green); color: #fff; }
+#picker .nums button.clearbtn { background: #f3e5e2; color: var(--red); font-size: 14px; }
+
+/* in-page modals (no native dialogs — they fail in iOS standalone/private mode) */
+.modalWrap { position: fixed; inset: 0; background: rgba(20,35,25,.6); display: none; align-items: center; justify-content: center; z-index: 95; }
+.modalWrap.show { display: flex; animation: pop .2s ease; }
+.modalPanel { background: #fff; border-radius: 14px; padding: 18px; width: min(88vw, 360px); text-align: center; }
+.modalPanel h3 { color: var(--green); margin-bottom: 10px; font-size: 16px; }
+.modalPanel p { font-size: 14px; margin-bottom: 4px; }
+.modalPanel .err { color: var(--red); font-size: 12px; min-height: 16px; margin-top: 6px; }
+.modalPanel .btnrow { display: flex; gap: 8px; margin-top: 12px; }
+.modalPanel .btnrow .btn { flex: 1; }
+
+/* PIN keypad — on-screen so it never depends on the iOS software keyboard */
+.pinDots { display: flex; justify-content: center; gap: 16px; margin: 10px 0 2px; }
+.pinDots span { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--green); background: transparent; transition: background .1s; }
+.pinDots span.filled { background: var(--green); }
+.pinPad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+.pinPad button { padding: 16px 0; font-size: 22px; font-weight: 800; border: none; border-radius: 12px; background: var(--fairway); color: var(--ink); cursor: pointer; }
+.pinPad button:active { background: #d7e8dc; }
+.pinPad button.act { background: #f3e5e2; color: var(--red); font-size: 15px; }
+
+#toast { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; z-index: 120; display: none; max-width: 90vw; text-align: center; box-shadow: 0 4px 16px rgba(0,0,0,.3); }
+#toast.show { display: block; animation: pop .2s ease; }
+
+#overlay { position: fixed; inset: 0; background: rgba(20,35,25,.82); display: none; align-items: center; justify-content: center; z-index: 100; flex-direction: column; }
+#overlay.show { display: flex; animation: pop .25s ease; }
+@keyframes pop { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+#overlay .photoWrap { width: min(72vw, 340px); height: min(72vw, 340px); border-radius: 18px; overflow: hidden; background: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 8px 40px rgba(0,0,0,.4); }
+#overlay img { width: 100%; height: 100%; object-fit: cover; }
+#overlay .emojiFallback { font-size: 110px; }
+#overlay .caption { color: #fff; font-size: 26px; font-weight: 800; margin-top: 16px; text-shadow: 0 2px 8px rgba(0,0,0,.5); text-align: center; padding: 0 20px; }
+#overlay .sub2 { color: #d8e5dc; font-size: 14px; margin-top: 4px; }
+
+.pairbox { display: flex; justify-content: space-between; align-items: center; padding: 9px 4px; border-bottom: 1px solid #edf2ee; font-size: 14px; }
+.pairbox .total { font-weight: 800; font-size: 16px; }
+.plist { font-size: 13px; }
+.plist div { display: flex; justify-content: space-between; padding: 6px 2px; border-bottom: 1px solid #f0f4f1; }
+</style>
+</head>
+<body>
+
+<header>
+<h1>🏌️ The Birthday Open</h1>
+<div class="sub">Torrey Pines North · Net tournament · A/B flights · blind draw</div>
+<span id="syncBadge">connecting…</span>
+</header>
+
+<!-- JOIN -->
+<div class="page" id="page-join">
+<div class="card welcome">
+<div class="big">Welcome to the Birthday Open!</div>
+<div class="hint">Torrey Pines North Course · Par 72</div>
+<p style="font-size:14px; margin:14px 0;">Enter your name and your regular handicap index — we'll convert it to your Torrey North course handicap automatically (White tees, slope 120). Index of 15.5 or better plays Flight A.</p>
+<div class="row"><input type="text" id="joinName" placeholder="Your name"></div>
+<div class="row"><input type="number" id="joinHcp" placeholder="Handicap index (e.g. 14.2)" min="0" max="54" step="0.1"></div>
+<button class="btn" onclick="joinTournament()">Join the Tournament</button>
+<p class="hint" style="margin-top:12px;"><a href="#" onclick="showPage('board');return false;">Just watching? View the live scoreboard →</a></p>
+<p class="hint"><a href="#" onclick="showReturning();return false;">Already joined on another device? Pick your name →</a></p>
+<div id="returningBox" style="display:none; margin-top:8px;">
+<select id="returningSelect"><option value="">— choose your name —</option></select>
+<button class="btn secondary" style="margin-top:8px" onclick="claimPlayer()">That's Me</button>
+</div>
+</div>
+</div>
+
+<!-- LEADERBOARD -->
+<div class="page" id="page-board">
+<div class="card"><h2>Flight A <span class="tag a">index 15.5 or better</span></h2>
+<table id="tblA"></table>
+</div>
+<div class="card"><h2>Flight B <span class="tag b">index over 15.5</span></h2>
+<table id="tblB"></table>
+</div>
+<div class="card"><h2>🎲 Blind Draw Pairs — best ball (net)</h2>
+<div id="pairsBoard" class="plist"><div class="hint">Pairs not drawn yet.</div></div>
+</div>
+<p class="hint" style="text-align:center">Scores shown to par (E = even). Net counts your strokes hole by hole. Team score is best ball — each hole takes the better net of the two partners.</p>
+</div>
+
+<!-- SCORECARD -->
+<div class="page" id="page-score">
+<div class="card">
+<h2>Enter Scores</h2>
+<select id="playerSelect"><option value="">— choose player —</option></select>
+<p class="hint" id="playerMeta"></p>
+<p class="hint"><a href="#" onclick="localStorage.removeItem('birthdayOpenPlayerId');myPlayerId=null;showPage('join');return false;">Not you? Go to the join screen →</a></p>
+</div>
+<div class="card" id="holesCard" style="display:none">
+<div class="proxyBanner" id="proxyBanner" style="display:none"></div>
+<div class="holes" id="holesGrid"></div>
+<p class="hint" style="margin-top:10px" id="scoreSummary"></p>
+</div>
+</div>
+
+<!-- PAIRS -->
+<div class="page" id="page-pairs">
+<div class="card"><h2>🎲 Blind Draw Pairs</h2><div id="pairsFull" class="plist"></div></div>
+</div>
+
+<!-- SETUP -->
+<div class="page" id="page-setup">
+<div class="card">
+<h2>Field (<span id="pCount">0</span> players)</h2>
+<div class="plist" id="playerList"></div>
+<p class="hint">Players join themselves from the welcome screen. Remove someone here if they typo'd.</p>
+</div>
+<div class="card">
+<h2>Score for a player without a phone</h2>
+<p class="hint" style="margin-top:0">Anyone can keep a friend's card. On the <b>My Scorecard</b> tab, pick that player from the dropdown and tap in their scores — a yellow banner reminds you it's not your own card, with one tap to switch back.</p>
+<button class="btn secondary" onclick="showPage('score')">Go to Scorecard →</button>
+</div>
+<div class="card">
+<h2>Blind Draw</h2>
+<button class="btn secondary" onclick="drawPairs()">🎲 Draw / Re-draw Pairs</button>
+<p class="hint">Randomly pairs the whole field. Pair score = sum of both players' net.</p>
+</div>
+<div class="card">
+<h2>Course — Torrey Pines North</h2>
+<div class="holes" id="parsGrid"></div>
+<p class="hint" id="parTotal"></p>
+</div>
+<div class="card">
+<h2>Danger Zone</h2>
+<button class="btn danger" onclick="resetScores()">Reset All Scores</button>
+</div>
+</div>
+
+<!-- SCORE PICKER -->
+<div id="picker" onclick="if(event.target===this)closePicker()">
+<div class="panel">
+<div class="ptitle" id="pkTitle"></div>
+<div class="psub" id="pkSub"></div>
+<div class="nums" id="pkNums"></div>
+</div>
+</div>
+
+<!-- PIN MODAL — on-screen keypad, no dependency on the phone's keyboard -->
+<div class="modalWrap" id="pinModal" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modalPanel">
+<h3>Admin PIN</h3>
+<div class="pinDots" id="pinDots"><span></span><span></span><span></span><span></span></div>
+<div class="err" id="pinErr"></div>
+<div class="pinPad" id="pinPad"></div>
+<div class="btnrow">
+<button class="btn secondary" onclick="document.getElementById('pinModal').classList.remove('show')">Cancel</button>
+</div>
+</div>
+</div>
+
+<!-- CONFIRM MODAL -->
+<div class="modalWrap" id="confirmModal" onclick="if(event.target===this)this.classList.remove('show')">
+<div class="modalPanel">
+<h3 id="cfTitle">Are you sure?</h3>
+<p id="cfMsg"></p>
+<div class="btnrow">
+<button class="btn secondary" onclick="document.getElementById('confirmModal').classList.remove('show')">Cancel</button>
+<button class="btn danger" id="cfYes">Yes, do it</button>
+</div>
+</div>
+</div>
+
+<div id="toast"></div>
+
+<!-- REACTION OVERLAY -->
+<div id="overlay" onclick="hideOverlay()">
+<div class="photoWrap">
+<img id="ovImg" alt="" onerror="this.style.display='none';document.getElementById('ovEmoji').style.display='block'">
+<div class="emojiFallback" id="ovEmoji" style="display:none"></div>
+</div>
+<div class="caption" id="ovCaption"></div>
+<div class="sub2" id="ovSub"></div>
+</div>
+
+<nav>
+<button data-page="board"><span class="ico">🏆</span>Scoreboard</button>
+<button data-page="score"><span class="ico">✏️</span>My Scorecard</button>
+<button data-page="pairs"><span class="ico">🎲</span>Pairs</button>
+<button data-page="setup"><span class="ico">⚙️</span>Setup</button>
+</nav>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+const FIREBASE_CONFIG = {
+apiKey: "AIzaSyDPOw8yG1ErAEWFtdI2e0ZNwKImuWBt6Yw",
+authDomain: "joe-h-bday.firebaseapp.com",
+databaseURL: "https://joe-h-bday-default-rtdb.firebaseio.com",
+projectId: "joe-h-bday",
+storageBucket: "joe-h-bday.firebasestorage.app",
+messagingSenderId: "359073329833",
+appId: "1:359073329833:web:6826b33695b2d1ec40efb8"
+};
+
+/* Reaction photos — files in /photos. Emoji fallback if missing. */
+const REACTIONS = {
+eagle: { img: "photos/eagle.jpg", emoji: "🦅", caption: "EAGLE?!", sub: "The birthday boy salutes you" },
+birdie: { img: "photos/birdie.jpg", emoji: "👍", caption: "BIRDIE!", sub: "Birthday boy approves" },
+par: { img: "photos/par.jpg", emoji: "😎", caption: "Par. Solid.", sub: "Respect" },
+bogey: { img: "photos/bogey.jpg", emoji: "🤷", caption: "Bogey…", sub: "He's seen worse" },
+double: { img: "photos/double.jpg", emoji: "😢", caption: "Double or Worse", sub: "You made the birthday boy sad" }
+};
+
+/* ---- Torrey Pines North Course ----
+Par + men's stroke index (HDCP) per hole, White tee yardage.
+Source: official Torrey Pines North scorecard. */
+const COURSE = {
+name: "Torrey Pines North",
+pars: [4,4,3,4,5,4,4,3,5, 5,4,3,4,4,3,4,5,4], // 36 out, 36 in, 72 total
+hcps: [5,1,13,3,11,7,9,17,15, 12,18,14,4,6,16,8,10,2],
+yards: [351,355,145,357,437,380,274,161,460, 460,310,108,383,340,145,336,472,373], // White tees
+slope: 120, rating: 69.3, par: 72 // White tees (men)
+};
+const FLIGHT_A_MAX_INDEX = 15.5; // index 15.5 or better = Flight A (Rigo 15.2 in A → 8/8)
+
+/* Course Handicap = Index × (Slope/113) + (Rating − Par), per WHS. */
+function courseHandicap(index){
+return Math.round(index * (COURSE.slope/113) + (COURSE.rating - COURSE.par));
+}
+
+let state = { players: {}, scores: {}, pairs: [] };
+let db = null, live = false;
+let myPlayerId = localStorage.getItem("birthdayOpenPlayerId") || null;
+
+function initStorage() {
+const badge = document.getElementById("syncBadge");
+if (FIREBASE_CONFIG) {
+try {
+firebase.initializeApp(FIREBASE_CONFIG);
+db = firebase.database().ref("tournament");
+db.on("value", snap => {
+const v = snap.val();
+state = Object.assign({ players:{}, scores:{}, pairs:[] }, v || {});
+// If this device remembers a player that no longer exists (removed by
+// admin, or field was cleared), forget it and offer the join screen.
+if (myPlayerId && !state.players[myPlayerId]) {
+myPlayerId = null;
+localStorage.removeItem("birthdayOpenPlayerId");
+if (document.getElementById("page-score").classList.contains("active")) showPage("join");
+}
+renderAll();
+});
+live = true;
+badge.textContent = "● LIVE — all phones synced";
+badge.className = "live";
+} catch (e) { console.error(e); fallbackLocal(badge); }
+} else fallbackLocal(badge);
+// First screen: scorecard if this device has a player, else join
+showPage(myPlayerId ? "score" : "join");
+}
+function fallbackLocal(badge){
+badge.textContent = "DEMO MODE — this device only";
+badge.className = "demo";
+const saved = localStorage.getItem("birthdayOpen");
+if (saved) { try { state = JSON.parse(saved); } catch(e){} }
+renderAll();
+}
+function persist() {
+if (live && db) db.set(state);
+else { localStorage.setItem("birthdayOpen", JSON.stringify(state)); renderAll(); }
+}
+
+/* ---------- helpers ---------- */
+const players = () => Object.entries(state.players || {}).map(([id,p]) => ({id, ...p}));
+function grossOf(id){ const s = (state.scores||{})[id]||{}; return Object.values(s).reduce((a,b)=>a+(b||0),0); }
+function thruOf(id){ const s = (state.scores||{})[id]||{}; return Object.values(s).filter(v=>v>0).length; }
+function netOf(id){ const p = (state.players||{})[id]; return grossOf(id) - (p ? p.hcp : 0); }
+/* Strokes received on a hole per USGA allocation: 1 stroke on holes with
+index <= handicap (plus a 2nd stroke on the hardest holes for 19+). */
+function strokesFor(hcp, hole){
+const idx = COURSE.hcps[hole];
+return Math.floor(hcp/18) + (idx <= (hcp % 18) ? 1 : 0);
+}
+/* ---- Scoring relative to par ----
+Net is computed HOLE BY HOLE: each hole's net = gross on that hole minus the
+strokes received there (strokesFor). Scores are shown relative to par so a
+par with a stroke reads E on gross and -1 on net. */
+function parThru(id){ const s=(state.scores||{})[id]||{}; let par=0; for(let h=0;h<18;h++){ if(s[h]>0) par+=COURSE.pars[h]; } return par; }
+function grossToPar(id){ return grossOf(id) - parThru(id); }
+function netHole(id, hole){ const s=(state.scores||{})[id]||{}; const g=s[hole]; if(!g) return null; const p=(state.players||{})[id]; return g - strokesFor(p ? p.hcp : 0, hole); }
+function netToPar(id){ const s=(state.scores||{})[id]||{}; let n=0; for(let h=0;h<18;h++){ if(s[h]>0) n += netHole(id,h) - COURSE.pars[h]; } return n; }
+function fmtToPar(n){ return n===0 ? "E" : n>0 ? "+"+n : ""+n; }
+/* Best ball for a blind-draw team: on each hole, count only the LOWER (better)
+net of the two partners; sum those across the round, shown relative to par. */
+function bestBall(ids){ let toPar=0, thru=0; for(let h=0;h<18;h++){ const nets=ids.map(id=>netHole(id,h)).filter(v=>v!==null); if(!nets.length) continue; toPar += Math.min(...nets) - COURSE.pars[h]; thru++; } return { toPar, thru }; }
+/* Flight by handicap INDEX (the number people know): 15.5 or better = A.
+Strokes and net use the converted course handicap. */
+function flightOf(p){ return (p.index !== undefined ? p.index : p.hcp) <= FLIGHT_A_MAX_INDEX ? "A" : "B"; }
+function flights(){
+const all = players();
+return { A: all.filter(p=>flightOf(p)==="A"), B: all.filter(p=>flightOf(p)==="B") };
+}
+
+/* ---------- join flow ---------- */
+function joinTournament(){
+const name = document.getElementById("joinName").value.trim();
+const index = parseFloat(document.getElementById("joinHcp").value);
+if (!name || isNaN(index) || index < 0) { toast("Enter your name and handicap index (e.g. 14.2)."); return; }
+const dup = players().find(p => p.name.toLowerCase() === name.toLowerCase());
+if (dup) { toast("That name is already in the field. If that's you, use \"Already joined?\" below."); return; }
+const hcp = Math.max(0, courseHandicap(index));
+const id = "p" + Date.now() + Math.floor(Math.random()*999);
+if (!state.players) state.players = {};
+state.players[id] = { name, index, hcp };
+myPlayerId = id;
+localStorage.setItem("birthdayOpenPlayerId", id);
+persist();
+const fl = flightOf({index});
+toast(`You're in! Index ${index} → Course Handicap ${hcp} at Torrey North (Whites, slope ${COURSE.slope}). Flight ${fl}${fl==="A"?" (15.5 or better)":""}.`, 6000);
+showPage("score");
+}
+function showReturning(){
+const box = document.getElementById("returningBox");
+const sel = document.getElementById("returningSelect");
+sel.innerHTML = "<option value=''>— choose your name —</option>" +
+players().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}">${p.name} (index ${p.index !== undefined ? p.index : p.hcp})</option>`).join("");
+box.style.display = "block";
+}
+function claimPlayer(){
+const id = document.getElementById("returningSelect").value;
+if (!id) return;
+myPlayerId = id;
+localStorage.setItem("birthdayOpenPlayerId", id);
+showPage("score");
+}
+
+/* ---------- rendering ---------- */
+function renderAll(){ renderBoard(); renderPlayerSelect(); renderHoles(); renderSetup(); }
+
+function renderFlightTable(el, list){
+const rows = list
+.map(p => ({...p, gtp: grossToPar(p.id), ntp: netToPar(p.id), thru: thruOf(p.id)}))
+.sort((a,b)=> (a.thru?a.ntp:9999) - (b.thru?b.ntp:9999) || a.name.localeCompare(b.name));
+const started = rows.filter(r=>r.thru>0);
+const loNet = started.length ? Math.min(...started.map(r=>r.ntp)) : null;
+const loGross = started.length ? Math.min(...started.map(r=>r.gtp)) : null;
+el.innerHTML = "<tr><th>Player</th><th class='num'>Hcp</th><th class='num'>Thru</th><th class='num'>Gross</th><th class='net'>Net</th><th></th></tr>" +
+(rows.length ? rows.map(r => {
+const isLo = r.thru>0 && r.ntp===loNet, isLg = r.thru>0 && r.gtp===loGross;
+const me = r.id === myPlayerId ? " <span class='tag me'>YOU</span>" : "";
+return `<tr class="${isLo?'leader':''}"><td>${r.name}${me}</td><td class='num'>${r.hcp}</td><td class='num'>${r.thru||"–"}</td><td class='num'>${r.thru?fmtToPar(r.gtp):"–"}</td><td class='net'>${r.thru?fmtToPar(r.ntp):"–"}</td><td>${isLo?"<span class='tag lo'>LOW NET</span>":""}${isLg?" <span class='tag lg'>LOW GROSS</span>":""}</td></tr>`;
+}).join("") : "<tr><td colspan='6' class='hint'>No players yet.</td></tr>");
+}
+function renderBoard(){
+const f = flights();
+renderFlightTable(document.getElementById("tblA"), f.A);
+renderFlightTable(document.getElementById("tblB"), f.B);
+const pb = document.getElementById("pairsBoard");
+if (!state.pairs || !state.pairs.length) { pb.innerHTML = "<div class='hint'>Pairs not drawn yet.</div>"; document.getElementById("pairsFull").innerHTML = pb.innerHTML; return; }
+const rows = state.pairs.map(pr => {
+const ids = pr.filter(id => state.players[id]);
+const names = pr.map(id => state.players[id] ? state.players[id].name : "?").join(" + ");
+const bb = bestBall(ids);
+return { names, toPar: bb.toPar, started: bb.thru > 0 };
+}).sort((a,b)=>(a.started?a.toPar:9999)-(b.started?b.toPar:9999));
+pb.innerHTML = rows.map((r,i)=>`<div class="pairbox"><span>${i===0&&r.started?"👑 ":""}${r.names}</span><span class="total">${r.started?fmtToPar(r.toPar):"–"}</span></div>`).join("");
+document.getElementById("pairsFull").innerHTML = pb.innerHTML;
+}
+
+function renderPlayerSelect(){
+const sel = document.getElementById("playerSelect");
+const cur = sel.value || myPlayerId;
+sel.innerHTML = "<option value=''>— choose player —</option>" +
+players().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`<option value="${p.id}">${p.name}</option>`).join("");
+if (cur && state.players && state.players[cur]) sel.value = cur;
+}
+function renderHoles(){
+const id = document.getElementById("playerSelect").value;
+const card = document.getElementById("holesCard");
+if (!id || !state.players || !state.players[id]) { card.style.display = "none"; document.getElementById("playerMeta").textContent=""; return; }
+card.style.display = "block";
+const p = state.players[id];
+// Proxy banner: you're keeping someone else's card (e.g. a player with no phone)
+const proxy = document.getElementById("proxyBanner");
+if (myPlayerId && id !== myPlayerId) {
+const me = state.players[myPlayerId];
+proxy.style.display = "block";
+proxy.innerHTML = `✏️ You're entering scores for <b>${p.name}</b> — not your own card.` +
+(me ? `<br><a href="#" onclick="backToMyCard();return false;">← Back to ${me.name}'s card</a>` : "");
+} else {
+proxy.style.display = "none";
+proxy.innerHTML = "";
+}
+document.getElementById("playerMeta").textContent =
+`Index ${p.index !== undefined ? p.index : "—"} → Course Hcp ${p.hcp} · Flight ${flightOf(p)} · ${COURSE.name} (Whites)`;
+const s = (state.scores||{})[id] || {};
+document.getElementById("holesGrid").innerHTML = COURSE.pars.map((par,i)=>{
+const v = s[i]||0;
+const cls = !v ? "unset" : v<par ? "under" : v>par ? "over" : "";
+const st = strokesFor(p.hcp, i);
+const stars = st ? ` <span class="stroke">${"*".repeat(st)}</span>` : "";
+return `<div class="hole ${!v?'unset':''}" onclick="openPicker('${id}',${i})">
+<div class="hnum">Hole ${i+1}${stars}</div><div class="hpar">Par ${par} · ${COURSE.yards[i]}y · Hcp ${COURSE.hcps[i]}</div>
+<span class="val ${cls}">${v||"·"}</span></div>`;
+}).join("");
+const thru = thruOf(id);
+document.getElementById("scoreSummary").textContent =
+thru ? `Thru ${thru} · Gross ${grossOf(id)} (${fmtToPar(grossToPar(id))}) · Net ${fmtToPar(netToPar(id))}` : "Tap a hole and enter your score. * = you get a stroke there.";
+}
+
+/* Jump the scorecard back to your own player after keeping a friend's card. */
+function backToMyCard(){
+if (!myPlayerId) return;
+const sel = document.getElementById("playerSelect");
+if (state.players && state.players[myPlayerId]) { sel.value = myPlayerId; renderHoles(); }
+}
+
+function renderSetup(){
+document.getElementById("pCount").textContent = players().length;
+document.getElementById("playerList").innerHTML = players().sort((a,b)=>a.hcp-b.hcp).map(p=>{
+const fl = flightOf(p)==="A" ? "<span class='tag a'>A</span>" : "<span class='tag b'>B</span>";
+return `<div><span>${p.name} ${fl}</span><span>index ${p.index !== undefined ? p.index : "—"} · course ${p.hcp} · thru ${thruOf(p.id)}
+&nbsp;<a href="#" onclick="resetPlayerScores('${p.id}');return false" title="Reset this player's scores">↺</a>
+&nbsp;<a href="#" onclick="removePlayer('${p.id}');return false" style="color:var(--red)" title="Remove player">✕</a></span></div>`;
+}).join("");
+document.getElementById("parsGrid").innerHTML = COURSE.pars.map((par,i)=>
+`<div class="hole"><div class="hnum">Hole ${i+1}</div><div class="hpar">Par ${par}</div><div class="hpar">${COURSE.yards[i]}y · Hcp ${COURSE.hcps[i]}</div></div>`).join("");
+document.getElementById("parTotal").textContent = COURSE.name + " · Par " + COURSE.par + " · White tees (rating " + COURSE.rating + ", slope " + COURSE.slope + "). Course handicap computed from index automatically. Flight A = index " + FLIGHT_A_MAX_INDEX + " or better.";
+}
+
+/* ---------- actions ---------- */
+function resetPlayerScores(id){
+const p = state.players[id];
+if (!p) return;
+confirmAction("Reset " + p.name + "'s scores?", "Their name and handicap stay in the field.", ()=>{
+if (state.scores) delete state.scores[id];
+persist();
+toast(p.name + "'s scores were reset.");
+});
+}
+function removePlayer(id){
+const p = state.players[id];
+if (!p) return;
+confirmAction("Remove " + p.name + "?", "They can rejoin from the welcome screen anytime.", ()=>{
+delete state.players[id]; if (state.scores) delete state.scores[id];
+state.pairs = (state.pairs||[]).filter(pr => !pr.includes(id));
+if (myPlayerId === id) { myPlayerId = null; localStorage.removeItem("birthdayOpenPlayerId"); }
+persist();
+toast(p.name + " removed from the field.");
+});
+}
+/* ---------- score picker: one tap, one number, one photo ---------- */
+let pickerCtx = null;
+function openPicker(id, hole){
+pickerCtx = { id, hole };
+const p = state.players[id];
+const par = COURSE.pars[hole];
+const st = strokesFor(p.hcp, hole);
+document.getElementById("pkTitle").textContent = `Hole ${hole+1} · Par ${par}`;
+document.getElementById("pkSub").textContent =
+(st ? `${p.name} gets ${st} stroke${st>1?"s":""} here · ` : "") + `${COURSE.yards[hole]} yds · Hcp ${COURSE.hcps[hole]}`;
+const cur = ((state.scores||{})[id]||{})[hole] || 0;
+let html = "";
+for (let n = 1; n <= 11; n++)
+html += `<button class="${n===par?'parbtn':''}" onclick="setScore(${n})">${n}${n===cur?" ✓":""}</button>`;
+html += `<button class="clearbtn" onclick="setScore(0)">clear</button>`;
+document.getElementById("pkNums").innerHTML = html;
+document.getElementById("picker").classList.add("show");
+}
+function closePicker(){ document.getElementById("picker").classList.remove("show"); pickerCtx = null; }
+function setScore(v){
+if (!pickerCtx) return;
+const { id, hole } = pickerCtx;
+closePicker();
+if (!state.scores) state.scores = {};
+if (!state.scores[id]) state.scores[id] = {};
+if (v === 0) delete state.scores[id][hole];
+else state.scores[id][hole] = v;
+persist();
+if (!live) renderHoles();
+if (v > 0) reactNet(id, hole, v);
+}
+
+/* Reaction is based on NET (this is a net tournament): gross minus any
+stroke(s) received on the hole, compared to par. Subtitle explains the math. */
+let reactTimer = null;
+function reactNet(id, hole, gross){
+const p = state.players[id];
+const par = COURSE.pars[hole];
+const st = strokesFor(p.hcp, hole);
+const net = gross - st;
+const diff = net - par;
+let key;
+if (diff <= -2) key = "eagle";
+else if (diff === -1) key = "birdie";
+else if (diff === 0) key = "par";
+else if (diff === 1) key = "bogey";
+else key = "double";
+const r = REACTIONS[key];
+const netName = diff <= -2 ? "Net Eagle" : diff === -1 ? "Net Birdie" : diff === 0 ? "Net Par" : diff === 1 ? "Net Bogey" : "Net Double+";
+const img = document.getElementById("ovImg"), em = document.getElementById("ovEmoji");
+img.style.display = "block"; em.style.display = "none";
+em.textContent = r.emoji;
+img.src = r.img + "?v=" + Date.now()%7;
+document.getElementById("ovCaption").textContent = st ? netName + "!" : r.caption;
+document.getElementById("ovSub").textContent =
+p.name + " · Hole " + (hole+1) + " · " +
+(st ? `Gross ${gross} − ${st} stroke${st>1?"s":""} = Net ${net}` : `Gross ${gross}, no stroke here`) +
+" · " + r.sub;
+document.getElementById("overlay").classList.add("show");
+clearTimeout(reactTimer);
+reactTimer = setTimeout(hideOverlay, 3000);
+}
+function hideOverlay(){ document.getElementById("overlay").classList.remove("show"); }
+/* Blind draw pairs one Flight A player with one Flight B player. If the two
+flights aren't equal, the balanced portion is paired A-with-B and any
+leftovers from the bigger flight are paired among themselves (with one solo
+if the total field is odd). */
+function doDraw(){
+const shuffle = arr => { for (let i = arr.length-1; i > 0; i--){ const j = Math.floor(Math.random()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]]; } return arr; };
+const f = flights();
+const a = shuffle(f.A.map(p=>p.id));
+const b = shuffle(f.B.map(p=>p.id));
+const pairs = [];
+const n = Math.min(a.length, b.length);
+for (let i = 0; i < n; i++) pairs.push([a[i], b[i]]);       // A vs B
+const rest = a.slice(n).concat(b.slice(n));                 // extras from the bigger flight
+for (let i = 0; i < rest.length; i += 2) pairs.push(rest.slice(i, i+2));
+state.pairs = pairs;
+persist();
+const uneven = a.length !== b.length;
+toast(uneven
+? "Pairs drawn — A vs B where possible. Flights are uneven, so some are paired within a flight. Check the Pairs tab."
+: "Pairs drawn — each Flight A player vs a Flight B player! Check the Pairs tab.", uneven ? 6000 : 4000);
+}
+function drawPairs(){
+if (players().length < 2) { toast("Need at least 2 players."); return; }
+if (state.pairs && state.pairs.length) confirmAction("Re-draw all pairs?", "The current pairings will be replaced.", doDraw);
+else doDraw();
+}
+function resetScores(){
+confirmAction("Wipe ALL scores?", "Players and pairs are kept. This can't be undone.", ()=>{
+state.scores = {};
+persist();
+toast("All scores wiped.");
+});
+}
+
+/* ---------- in-page dialogs (native prompt/confirm/alert are unreliable
+on iOS home-screen apps and private tabs — never use them) ---------- */
+let toastTimer = null;
+function toast(msg, ms){
+const t = document.getElementById("toast");
+t.textContent = msg; t.classList.add("show");
+clearTimeout(toastTimer);
+toastTimer = setTimeout(()=>t.classList.remove("show"), ms || 4000);
+}
+let cfCallback = null;
+function confirmAction(title, msg, fn){
+document.getElementById("cfTitle").textContent = title;
+document.getElementById("cfMsg").textContent = msg;
+cfCallback = fn;
+document.getElementById("confirmModal").classList.add("show");
+}
+document.getElementById("cfYes").addEventListener("click", ()=>{
+document.getElementById("confirmModal").classList.remove("show");
+if (cfCallback) { const f = cfCallback; cfCallback = null; f(); }
+});
+
+/* ---------- admin gate ----------
+The PIN is entered on an in-page numeric keypad. iOS Safari (and iOS
+home-screen web apps especially) will NOT raise the software keyboard for a
+programmatically focused field, which left the admin unable to type a PIN.
+The keypad removes any dependency on the phone's keyboard. */
+const ADMIN_PIN = "6252";
+let pinBuffer = "";
+function adminUnlocked(){ return localStorage.getItem("birthdayOpenAdmin") === "yes"; }
+function renderPinDots(){
+const dots = document.getElementById("pinDots").children;
+for (let i = 0; i < dots.length; i++) dots[i].classList.toggle("filled", i < pinBuffer.length);
+}
+function buildPinPad(){
+let html = "";
+for (let n = 1; n <= 9; n++) html += `<button onclick="pinPress('${n}')">${n}</button>`;
+html += `<button class="act" onclick="pinBack()">⌫</button>`;
+html += `<button onclick="pinPress('0')">0</button>`;
+html += `<button class="act" onclick="pinClear()">clear</button>`;
+document.getElementById("pinPad").innerHTML = html;
+}
+function pinPress(d){
+if (pinBuffer.length >= 4) return;
+pinBuffer += d;
+document.getElementById("pinErr").textContent = "";
+renderPinDots();
+if (pinBuffer.length === 4) setTimeout(submitPin, 140);
+}
+function pinBack(){ pinBuffer = pinBuffer.slice(0, -1); document.getElementById("pinErr").textContent = ""; renderPinDots(); }
+function pinClear(){ pinBuffer = ""; document.getElementById("pinErr").textContent = ""; renderPinDots(); }
+function openPinModal(){
+pinBuffer = "";
+document.getElementById("pinErr").textContent = "";
+buildPinPad();
+renderPinDots();
+document.getElementById("pinModal").classList.add("show");
+}
+function submitPin(){
+if (pinBuffer === ADMIN_PIN) {
+localStorage.setItem("birthdayOpenAdmin", "yes");
+document.getElementById("pinModal").classList.remove("show");
+pinBuffer = "";
+renderPinDots();
+showPage("setup");
+} else {
+document.getElementById("pinErr").textContent = "Wrong PIN — try again.";
+pinBuffer = "";
+renderPinDots();
+}
+}
+
+/* ---------- nav ---------- */
+function showPage(name){
+if (name === "setup" && !adminUnlocked()) { openPinModal(); return; }
+document.querySelectorAll("nav button").forEach(x=>x.classList.toggle("active", x.dataset.page===name));
+document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+const pg = document.getElementById("page-" + name);
+if (pg) pg.classList.add("active");
+if (name === "score" && myPlayerId && state.players && state.players[myPlayerId]) {
+document.getElementById("playerSelect").value = myPlayerId;
+renderHoles();
+}
+}
+document.querySelectorAll("nav button").forEach(b => b.addEventListener("click", () => showPage(b.dataset.page)));
+document.getElementById("playerSelect").addEventListener("change", renderHoles);
+
+initStorage();
+</script>
+</body>
+</html>
